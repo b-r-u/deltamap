@@ -1,19 +1,19 @@
 use image;
 use linked_hash_map::{Entry, LinkedHashMap};
-use tile::Tile;
+use coord::TileCoord;
 use tile_loader::TileLoader;
 use tile_source::TileSource;
 
 
 pub struct TileCache {
     loader: TileLoader,
-    map: LinkedHashMap<Tile, image::DynamicImage>,
+    map: LinkedHashMap<TileCoord, image::DynamicImage>,
     max_tiles: usize,
 }
 
 impl TileCache {
     pub fn new<F>(new_tile_func: F) -> Self
-        where F: Fn(Tile) + Sync + Send + 'static,
+        where F: Fn(TileCoord) + Sync + Send + 'static,
     {
         TileCache {
             loader: TileLoader::new(move |tile| {
@@ -26,7 +26,7 @@ impl TileCache {
 
     pub fn get_sync(
         &mut self,
-        tile: Tile,
+        tile: TileCoord,
         source: &TileSource,
         write_to_file: bool,
         ) -> Option<&image::DynamicImage>
@@ -51,7 +51,7 @@ impl TileCache {
 
     pub fn get_async(
         &mut self,
-        tile: Tile,
+        tile: TileCoord,
         source: &TileSource,
         write_to_file: bool,
         ) -> Option<&image::DynamicImage>
@@ -79,7 +79,7 @@ impl TileCache {
     }
 
     // Return a tile from the cache but do not use TileLoader.
-    pub fn lookup(&mut self, tile: Tile, source: &TileSource) -> Option<&image::DynamicImage> {
+    pub fn lookup(&mut self, tile: TileCoord, source: &TileSource) -> Option<&image::DynamicImage> {
         //TODO Return the value from get_refresh with borrowck agreeing that this is OK.
         self.map.get_refresh(&tile);
 

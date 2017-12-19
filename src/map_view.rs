@@ -1,5 +1,4 @@
-use coord::{MapCoord, ScreenCoord, ScreenRect};
-use tile::Tile;
+use coord::{MapCoord, ScreenCoord, ScreenRect, TileCoord};
 
 
 #[derive(Clone, Debug)]
@@ -13,7 +12,7 @@ pub struct MapView {
 
 #[derive(Clone, Debug)]
 pub struct VisibleTile {
-    pub tile: Tile,
+    pub tile: TileCoord,
     pub rect: ScreenRect,
 }
 
@@ -49,7 +48,7 @@ impl MapView {
         }
     }
 
-    pub fn tile_screen_position(&self, tile: &Tile) -> ScreenCoord {
+    pub fn tile_screen_position(&self, tile: &TileCoord) -> ScreenCoord {
         self.map_to_screen_coord(tile.map_coord())
     }
 
@@ -63,8 +62,8 @@ impl MapView {
             top_left_tile_screen_coord.snap_to_pixel();
         }
 
-        let start_tile_x = top_left_tile.tile_x;
-        let start_tile_y = top_left_tile.tile_y;
+        let start_tile_x = top_left_tile.x;
+        let start_tile_y = top_left_tile.y;
         let num_tiles_x = ((self.width - top_left_tile_screen_coord.x) / tile_screen_size).ceil().max(0.0) as i32;
         let num_tiles_y = ((self.height - top_left_tile_screen_coord.y) / tile_screen_size).ceil().max(0.0) as i32;
 
@@ -72,7 +71,7 @@ impl MapView {
 
         for y in 0..num_tiles_y {
             for x in 0..num_tiles_x {
-                let t = Tile::new(uzoom, start_tile_x + x, start_tile_y + y);
+                let t = TileCoord::new(uzoom, start_tile_x + x, start_tile_y + y);
                 if t.is_on_planet() {
                     visible_tiles.push(
                         VisibleTile {

@@ -1,4 +1,4 @@
-use tile::Tile;
+use coord::TileCoord;
 use std::path::{Path, PathBuf};
 
 
@@ -10,7 +10,7 @@ pub struct TileSource {
     max_zoom: u32,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TileSourceId {
     id: u32,
 }
@@ -36,17 +36,16 @@ impl TileSource {
         }
     }
 
-    pub fn local_tile_path(&self, tile: Tile) -> PathBuf {
-
+    pub fn local_tile_path(&self, tile: TileCoord) -> PathBuf {
         let mut path = PathBuf::from(&self.directory);
         path.push(tile.zoom.to_string());
-        path.push(tile.tile_x.to_string());
-        path.push(tile.tile_y.to_string() + ".png");
+        path.push(tile.x.to_string());
+        path.push(tile.y.to_string() + ".png");
 
         path
     }
 
-    pub fn remote_tile_url(&self, tile: Tile) -> String {
+    pub fn remote_tile_url(&self, tile: TileCoord) -> String {
         Self::fill_template(&self.url_template, tile)
     }
 
@@ -54,9 +53,9 @@ impl TileSource {
         self.max_zoom
     }
 
-    fn fill_template(template: &str, tile: Tile) -> String {
-        let x_str = tile.tile_x.to_string();
-        let y_str = tile.tile_y.to_string();
+    fn fill_template(template: &str, tile: TileCoord) -> String {
+        let x_str = tile.x.to_string();
+        let y_str = tile.y.to_string();
         let z_str = tile.zoom.to_string();
 
         //let len = (template.len() + x_str.len() + y_str.len() + z_str.len()).saturating_sub(9);

@@ -29,7 +29,7 @@ impl MapCoord {
     }
 
     //TODO differ between normalized and not normalized tiles
-    pub fn on_tile_at_zoom(&self, zoom: u32) -> Tile {
+    pub fn on_tile_at_zoom(&self, zoom: u32) -> TileCoord {
         let zoom_factor = f64::powi(2.0, zoom as i32);
         let ix = (self.x * zoom_factor).floor() as i32;
         let iy = (self.y * zoom_factor).floor() as i32;
@@ -37,10 +37,10 @@ impl MapCoord {
         let x = ix;
         let y = iy;
 
-        Tile {
+        TileCoord {
             zoom: zoom,
-            tile_x: x,
-            tile_y: y,
+            x: x,
+            y: y,
         }
     }
 
@@ -101,4 +101,72 @@ pub struct ScreenRect {
     pub y: f64,
     pub width: f64,
     pub height: f64,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TileCoord {
+    pub zoom: u32,
+    pub x: i32,
+    pub y: i32,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SubTileCoord {
+    pub size: u32,
+    pub x: u32,
+    pub y: u32,
+}
+
+impl TileCoord {
+    pub fn new(zoom: u32, x: i32, y: i32) -> TileCoord {
+        TileCoord {
+            zoom: zoom,
+            x: Self::normalize_coord(x, zoom),
+            y: y,
+        }
+    }
+
+    pub fn is_on_planet(&self) -> bool {
+        let num_tiles = Self::get_zoom_level_tiles(self.zoom);
+        self.y >= 0 && self.y < num_tiles &&
+        self.x >= 0 && self.x < num_tiles
+    }
+
+    pub fn map_coord(&self) -> MapCoord {
+        let inv_zoom_factor = f64::powi(2.0, -(self.zoom as i32));
+        MapCoord::new(f64::from(self.x) * inv_zoom_factor, f64::from(self.y) * inv_zoom_factor)
+    }
+
+    pub fn parent(&self, distance: u32) -> Option<(TileCoord, SubTileCoord)> {
+        if distance > self.zoom {
+            None
+        } else {
+            let scale = u32::pow(2, distance);
+
+            Some((
+                TileCoord {
+                    zoom: self.zoom - distance,
+                    x: self.x / scale as i32,
+                    y: self.y / scale as i32,
+                },
+                SubTileCoord {
+                    size: scale,
+                    x: (Self::normalize_coord(self.x, self.zoom) as u32) % scale,
+                    y: (Self::normalize_coord(self.y, self.zoom) as u32) % scale,
+                },
+            ))
+        }
+    }
+
+    #[inline]
+    fn normalize_coord(coord: i32, zoom: u32) -> i32 {
+        let max = Self::get_zoom_level_tiles(zoom);
+        ((coord % max) + max) % max
+    }
+
+    #[inline]
+    pub fn get_zoom_level_tiles(zoom: u32) -> i32 {
+        //TODO throw error when zoom too big
+        i32::pow(2, zoom)
+    }
 }

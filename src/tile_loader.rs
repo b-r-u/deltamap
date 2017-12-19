@@ -1,3 +1,4 @@
+use coord::TileCoord;
 use image::DynamicImage;
 use image;
 use reqwest::Client;
@@ -7,8 +8,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
-use tile::Tile;
-use tile_source::TileSource;
+use tile_source::{TileSource, TileSourceId};
 
 
 //TODO remember failed loading attempts
@@ -17,15 +17,14 @@ use tile_source::TileSource;
 pub struct TileLoader {
     client: Option<Client>,
     join_handle: thread::JoinHandle<()>,
-    request_tx: mpsc::Sender<(Tile, String, PathBuf, bool)>,
-    result_rx: mpsc::Receiver<(Tile, Option<DynamicImage>)>,
-    //TODO store source together with tile in pending
-    pending: HashSet<Tile>,
+    request_tx: mpsc::Sender<(TileCoord, TileSourceId, String, PathBuf, bool)>,
+    result_rx: mpsc::Receiver<(TileCoord, TileSourceId, Option<DynamicImage>)>,
+    pending: HashSet<(TileCoord, TileSourceId)>,
 }
 
 impl TileLoader {
     pub fn new<F>(notice_func: F) -> Self
-        where F: Fn(Tile) + Sync + Send + 'static,
+        where F: Fn(TileCoord) + Sync + Send + 'static,
     {
         let (request_tx, request_rx) = mpsc::channel();
         let (result_tx, result_rx) = mpsc::channel();
@@ -40,18 +39,18 @@ impl TileLoader {
     }
 
     fn work<F>(
-        request_rx: mpsc::Receiver<(Tile, String, PathBuf, bool)>,
-        result_tx: mpsc::Sender<(Tile, Option<DynamicImage>)>,
+        request_rx: mpsc::Receiver<(TileCoord, TileSourceId, String, PathBuf, bool)>,
+        result_tx: mpsc::Sender<(TileCoord, TileSourceId, Option<DynamicImage>)>,
         notice_func: F,
     )
-        where F: Fn(Tile) + Sync + Send + 'static,
+        where F: Fn(TileCoord) + Sync + Send + 'static,
     {
         let mut client_opt = None;
-        while let Ok((tile, url, path, write_to_file)) = request_rx.recv() {
+        while let Ok((tile, source_id, url, path, write_to_file)) = request_rx.recv() {
             println!("work {:?}", tile);
             match image::open(&path) {
                 Ok(img) => {
-                    result_tx.send((tile, Some(img))).unwrap();
+                    result_tx.send((tile, source_id, Some(img))).unwrap();
                     notice_func(tile);
                     continue;
                 },
@@ -67,7 +66,7 @@ impl TileLoader {
                             let mut buf: Vec<u8> = vec![];
                             response.copy_to(&mut buf).unwrap();
                             if let Ok(img) = image::load_from_memory(&buf) {
-                                result_tx.send((tile, Some(img))).unwrap();
+                                result_tx.send((tile, source_id, Some(img))).unwrap();
                                 notice_func(tile);
 
                                 if write_to_file {
@@ -81,19 +80,20 @@ impl TileLoader {
                     }
                 },
             }
-            result_tx.send((tile, None)).unwrap();
+            result_tx.send((tile, source_id, None)).unwrap();
         }
     }
 
-    pub fn async_request(&mut self, tile: Tile, source: &TileSource, write_to_file: bool) {
+    pub fn async_request(&mut self, tile: TileCoord, source: &TileSource, write_to_file: bool) {
         if tile.zoom > source.max_tile_zoom() {
             return;
         }
 
-        if !self.pending.contains(&tile) {
-            self.pending.insert(tile);
+        if !self.pending.contains(&(tile, source.id())) {
+            self.pending.insert((tile, source.id()));
             self.request_tx.send((
                 tile,
+                source.id(),
                 source.remote_tile_url(tile),
                 source.local_tile_path(tile),
                 write_to_file
@@ -101,21 +101,21 @@ impl TileLoader {
         }
     }
 
-    pub fn async_result(&mut self) -> Option<(Tile, DynamicImage)> {
+    pub fn async_result(&mut self) -> Option<(TileCoord, DynamicImage)> {
         match self.result_rx.try_recv() {
             Err(_) => None,
-            Ok((tile, None)) => {
-                self.pending.remove(&tile);
+            Ok((tile, source_id, None)) => {
+                self.pending.remove(&(tile, source_id));
                 None
             },
-            Ok((tile, Some(img))) => {
-                self.pending.remove(&tile);
+            Ok((tile, source_id, Some(img))) => {
+                self.pending.remove(&(tile, source_id));
                 Some((tile, img))
             },
         }
     }
 
-    pub fn get_sync(&mut self, tile: Tile, source: &TileSource, write_to_file: bool) -> Option<DynamicImage> {
+    pub fn get_sync(&mut self, tile: TileCoord, source: &TileSource, write_to_file: bool) -> Option<DynamicImage> {
         match image::open(source.local_tile_path(tile)) {
             Ok(img) => {
                 Some(img)

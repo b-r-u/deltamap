@@ -1,10 +1,9 @@
-use coord::ScreenRect;
+use coord::{ScreenRect, SubTileCoord, TileCoord};
 use linked_hash_map::LinkedHashMap;
 use map_view::VisibleTile;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use texture::Texture;
-use tile::{Tile, SubTileCoord};
 use tile_cache::TileCache;
 use tile_source::TileSource;
 
@@ -38,8 +37,8 @@ pub struct TexturedVisibleTile {
 pub struct TileCacheGl<'a> {
     texture: Texture<'a>,
     tile_size: u32,
-    slots_lru: LinkedHashMap<CacheSlot, Option<Tile>>, // LRU cache of slots
-    tile_to_slot: HashMap<Tile, CacheSlot>,
+    slots_lru: LinkedHashMap<CacheSlot, Option<TileCoord>>, // LRU cache of slots
+    tile_to_slot: HashMap<TileCoord, CacheSlot>,
 }
 
 impl<'a> TileCacheGl<'a> {
@@ -70,7 +69,7 @@ impl<'a> TileCacheGl<'a> {
         CacheSlot { x: 0, y: 0 }
     }
 
-    pub fn store(&mut self, tile: Tile, source: &TileSource, cache: &mut TileCache, load: bool) -> Option<CacheSlot> {
+    pub fn store(&mut self, tile: TileCoord, source: &TileSource, cache: &mut TileCache, load: bool) -> Option<CacheSlot> {
         let mut remove_tile = None;
 
         let slot = match self.tile_to_slot.entry(tile) {
