@@ -4,6 +4,7 @@ use map_view::VisibleTile;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use texture::Texture;
+use tile::Tile;
 use tile_cache::TileCache;
 use tile_source::TileSource;
 
@@ -37,8 +38,8 @@ pub struct TexturedVisibleTile {
 pub struct TileCacheGl<'a> {
     texture: Texture<'a>,
     tile_size: u32,
-    slots_lru: LinkedHashMap<CacheSlot, Option<TileCoord>>, // LRU cache of slots
-    tile_to_slot: HashMap<TileCoord, CacheSlot>,
+    slots_lru: LinkedHashMap<CacheSlot, Option<Tile>>, // LRU cache of slots
+    tile_to_slot: HashMap<Tile, CacheSlot>,
 }
 
 impl<'a> TileCacheGl<'a> {
@@ -69,15 +70,16 @@ impl<'a> TileCacheGl<'a> {
         CacheSlot { x: 0, y: 0 }
     }
 
-    pub fn store(&mut self, tile: TileCoord, source: &TileSource, cache: &mut TileCache, load: bool) -> Option<CacheSlot> {
+    pub fn store(&mut self, tile_coord: TileCoord, source: &TileSource, cache: &mut TileCache, load: bool) -> Option<CacheSlot> {
         let mut remove_tile = None;
+        let tile = Tile::new(tile_coord, source.id());
 
         let slot = match self.tile_to_slot.entry(tile) {
             Entry::Vacant(entry) => {
                 let img_option = if load {
-                    cache.get_async(tile, source, true)
+                    cache.get_async(tile_coord, source, true)
                 } else {
-                    cache.lookup(tile, source)
+                    cache.lookup(tile)
                 };
 
                 if let Some(img) = img_option {

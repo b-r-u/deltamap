@@ -1,5 +1,5 @@
 use coord::TileCoord;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 
 #[derive(Clone, Debug)]
@@ -36,35 +36,31 @@ impl TileSource {
         }
     }
 
-    pub fn local_tile_path(&self, tile: TileCoord) -> PathBuf {
+    pub fn local_tile_path(&self, tile_coord: TileCoord) -> PathBuf {
         let mut path = PathBuf::from(&self.directory);
-        path.push(tile.zoom.to_string());
-        path.push(tile.x.to_string());
-        path.push(tile.y.to_string() + ".png");
+        path.push(tile_coord.zoom.to_string());
+        path.push(tile_coord.x.to_string());
+        path.push(tile_coord.y.to_string() + ".png");
 
         path
     }
 
-    pub fn remote_tile_url(&self, tile: TileCoord) -> String {
-        Self::fill_template(&self.url_template, tile)
+    pub fn remote_tile_url(&self, tile_coord: TileCoord) -> String {
+        Self::fill_template(&self.url_template, tile_coord)
     }
 
     pub fn max_tile_zoom(&self) -> u32 {
         self.max_zoom
     }
 
-    fn fill_template(template: &str, tile: TileCoord) -> String {
-        let x_str = tile.x.to_string();
-        let y_str = tile.y.to_string();
-        let z_str = tile.zoom.to_string();
-
-        //let len = (template.len() + x_str.len() + y_str.len() + z_str.len()).saturating_sub(9);
+    fn fill_template(template: &str, tile_coord: TileCoord) -> String {
+        let x_str = tile_coord.x.to_string();
+        let y_str = tile_coord.y.to_string();
+        let z_str = tile_coord.zoom.to_string();
 
         //TODO use the regex crate for templates or some other more elegant method
-        let string = template.replacen("{x}", &x_str, 1);
-        let string = string.replacen("{y}", &y_str, 1);
-        let string = string.replacen("{z}", &z_str, 1);
-
-        return string;
+        template.replacen("{x}", &x_str, 1)
+                .replacen("{y}", &y_str, 1)
+                .replacen("{z}", &z_str, 1)
     }
 }

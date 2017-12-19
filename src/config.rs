@@ -33,15 +33,15 @@ impl Config {
         toml::from_str(&content).ok()
     }
 
-    pub fn tile_sources(&self) -> BTreeMap<String, TileSource> {
-        let mut map = BTreeMap::new();
+    pub fn tile_sources(&self) -> Vec<(String, TileSource)> {
+        let mut vec = Vec::with_capacity(self.sources.len());
 
         for (id, (name, source)) in self.sources.iter().enumerate() {
             let mut path = PathBuf::from(&self.tile_cache_dir);
             //TODO escape name (no slashes or dots)
             path.push(name);
 
-            map.insert(
+            vec.push((
                 name.clone(),
                 TileSource::new(
                     id as u32,
@@ -49,9 +49,9 @@ impl Config {
                     path,
                     source.max_zoom,
                 ),
-            );
+            ));
         }
 
-        return map;
+        vec
     }
 }

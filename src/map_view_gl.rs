@@ -19,13 +19,12 @@ pub struct MapViewGl<'a> {
     buf: Buffer<'a>,
     viewport_size: (u32, u32),
     map_view: MapView,
-    tile_source: TileSource,
     tile_cache: TileCache,
     tile_cache_gl: TileCacheGl<'a>,
 }
 
 impl<'a> MapViewGl<'a> {
-    pub fn new<F>(cx: &Context, tile_source: TileSource, initial_size: (u32, u32), update_func: F) -> MapViewGl
+    pub fn new<F>(cx: &Context, initial_size: (u32, u32), update_func: F) -> MapViewGl
         where F: Fn() + Sync + Send + 'static,
     {
         println!("version: {}", cx.gl_version());
@@ -74,8 +73,6 @@ impl<'a> MapViewGl<'a> {
                 buf: buf,
                 viewport_size: initial_size,
                 map_view: map_view,
-                //TODO load templates from config
-                tile_source: tile_source,
                 tile_cache: TileCache::new(move |_tile| update_func()),
                 tile_cache_gl: TileCacheGl::new(tex, 256),
             }
@@ -94,12 +91,12 @@ impl<'a> MapViewGl<'a> {
         }
     }
 
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self, source: &TileSource) {
         {
             let visible_tiles = self.map_view.visible_tiles(true);
             let textured_visible_tiles = self.tile_cache_gl.textured_visible_tiles(
                 &visible_tiles,
-                &self.tile_source,
+                source,
                 &mut self.tile_cache,
             );
 

@@ -1,5 +1,4 @@
 use std::f64::consts::PI;
-use tile::Tile;
 
 /// A position in map coordinates.
 /// Valid values for x and y lie in the interval [0.0, 1.0].
