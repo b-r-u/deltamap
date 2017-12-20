@@ -7,6 +7,7 @@ pub struct TileSource {
     id: u32,
     url_template: String,
     directory: PathBuf,
+    extension: String,
     max_zoom: u32,
 }
 
@@ -20,12 +21,14 @@ impl TileSource {
         id: u32,
         url_template: S,
         directory: P,
+        extension: String,
         max_zoom: u32,
     ) -> Self {
         TileSource {
             id: id,
             url_template: url_template.into(),
             directory: directory.into(),
+            extension: extension,
             max_zoom: max_zoom,
         }
     }
@@ -40,7 +43,7 @@ impl TileSource {
         let mut path = PathBuf::from(&self.directory);
         path.push(tile_coord.zoom.to_string());
         path.push(tile_coord.x.to_string());
-        path.push(tile_coord.y.to_string() + ".png");
+        path.push(tile_coord.y.to_string() + "." + &self.extension);
 
         path
     }

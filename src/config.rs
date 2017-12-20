@@ -16,6 +16,7 @@ pub struct Config {
 struct Source {
     max_zoom: u32,
     url_template: String,
+    extension: String,
 }
 
 impl Config {
@@ -47,6 +48,7 @@ impl Config {
                     id as u32,
                     source.url_template.clone(),
                     path,
+                    source.extension.clone(),
                     source.max_zoom,
                 ),
             ));

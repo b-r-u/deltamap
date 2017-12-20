@@ -48,7 +48,7 @@ impl TileLoader {
     {
         let mut client_opt = None;
         while let Ok((tile, url, path, write_to_file)) = request_rx.recv() {
-            println!("work {:?}", tile);
+            println!("work {:?} {:?}", tile, path);
             match image::open(&path) {
                 Ok(img) => {
                     result_tx.send((tile, Some(img))).unwrap();

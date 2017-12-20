@@ -170,7 +170,7 @@ fn main() {
     let mut sources = TileSources::new(config.tile_sources()).unwrap();
 
     let mut window = glutin::WindowBuilder::new().build().unwrap();
-    window.set_title("DeltaMap");
+    window.set_title(&("DeltaMap - ".to_string() + sources.current_name()));
     window.set_window_resize_callback(Some(resize_callback as fn(u32, u32)));
     let _ = unsafe { window.make_current() };
 
@@ -194,6 +194,7 @@ fn main() {
 
     'outer: for event in window.wait_events() {
         let mut start_loop = Instant::now();
+        let start_source_id = sources.current().id();
 
         let mut redraw = false;
 
@@ -247,6 +248,11 @@ fn main() {
             let diff = start_loop.elapsed();
             println!("EVENT LOOP SECS {}", diff.as_secs() as f64 + f64::from(diff.subsec_nanos()) * 1e-9);
         }
+
+        // set window title
+        if sources.current().id() != start_source_id {
+            window.set_title(&("DeltaMap - ".to_string() + sources.current_name()));
+        }
     }
 }
 
@@ -269,6 +275,10 @@ impl TileSources {
 
     pub fn current(&self) -> &TileSource {
         &self.sources[self.current_index].1
+    }
+
+    pub fn current_name(&self) -> &str {
+        &self.sources[self.current_index].0
     }
 
     pub fn switch_to_next(&mut self) {
