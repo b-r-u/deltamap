@@ -4,3 +4,8 @@ tile_cache_dir = "/tmp"
 max_zoom = 19
 url_template = "http://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
 extension = "png"
+
+[sources.esri]
+max_zoom = 19
+url_template = "https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+extension = "jpg"
