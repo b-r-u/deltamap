@@ -1,6 +1,6 @@
 use image;
 use linked_hash_map::{Entry, LinkedHashMap};
-use coord::TileCoord;
+use coord::{TileCoord, View};
 use tile::Tile;
 use tile_loader::TileLoader;
 use tile_source::TileSource;
@@ -89,6 +89,10 @@ impl TileCache {
         self.map.get_refresh(&tile);
 
         self.map.get(&tile)
+    }
+
+    pub fn set_view_location(&mut self, view: View) {
+        self.loader.set_view_location(view);
     }
 }
 

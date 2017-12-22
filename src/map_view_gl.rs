@@ -2,7 +2,7 @@ use ::context;
 use ::std::ffi::CStr;
 use buffer::{Buffer, DrawMode};
 use context::Context;
-use coord::ScreenCoord;
+use coord::{ScreenCoord, View};
 use image;
 use map_view::MapView;
 use program::Program;
@@ -92,6 +92,12 @@ impl<'a> MapViewGl<'a> {
     }
 
     pub fn draw(&mut self, source: &TileSource) {
+        self.tile_cache.set_view_location(View {
+            source_id: source.id(),
+            zoom: self.map_view.zoom_level(),
+            center: self.map_view.center,
+        });
+
         {
             let visible_tiles = self.map_view.visible_tiles(true);
             let textured_visible_tiles = self.tile_cache_gl.textured_visible_tiles(

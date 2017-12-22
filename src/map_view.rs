@@ -49,11 +49,11 @@ impl MapView {
     }
 
     pub fn tile_screen_position(&self, tile: &TileCoord) -> ScreenCoord {
-        self.map_to_screen_coord(tile.map_coord())
+        self.map_to_screen_coord(tile.map_coord_north_west())
     }
 
     pub fn visible_tiles(&self, snap_to_pixel: bool) -> Vec<VisibleTile> {
-        let uzoom = self.zoom2.floor().max(0.0) as u32;
+        let uzoom = self.zoom_level();
         let top_left_tile = self.top_left_coord().on_tile_at_zoom(uzoom);
         let mut top_left_tile_screen_coord = self.tile_screen_position(&top_left_tile);
         let tile_screen_size = f64::powf(2.0, self.zoom2 - f64::from(uzoom)) * f64::from(self.tile_size);
@@ -89,6 +89,11 @@ impl MapView {
         }
 
         visible_tiles
+    }
+
+    //TODO make zoom level configurable
+    pub fn zoom_level(&self) -> u32 {
+        self.zoom2.floor().max(0.0) as u32
     }
 
     pub fn set_size(&mut self, width: f64, height: f64) {

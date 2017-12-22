@@ -1,4 +1,5 @@
 use std::f64::consts::PI;
+use tile_source::TileSourceId;
 
 /// A position in map coordinates.
 /// Valid values for x and y lie in the interval [0.0, 1.0].
@@ -131,9 +132,19 @@ impl TileCoord {
         self.x >= 0 && self.x < num_tiles
     }
 
-    pub fn map_coord(&self) -> MapCoord {
+    // Return the MapCoord of the top left corner of the current tile.
+    pub fn map_coord_north_west(&self) -> MapCoord {
         let inv_zoom_factor = f64::powi(2.0, -(self.zoom as i32));
         MapCoord::new(f64::from(self.x) * inv_zoom_factor, f64::from(self.y) * inv_zoom_factor)
+    }
+
+    // Return the MapCoord of the center of the current tile.
+    pub fn map_coord_center(&self) -> MapCoord {
+        let inv_zoom_factor = f64::powi(2.0, -(self.zoom as i32));
+        MapCoord::new(
+            (f64::from(self.x) + 0.5) * inv_zoom_factor,
+            (f64::from(self.y) + 0.5) * inv_zoom_factor,
+        )
     }
 
     pub fn parent(&self, distance: u32) -> Option<(TileCoord, SubTileCoord)> {
@@ -168,4 +179,12 @@ impl TileCoord {
         //TODO throw error when zoom too big
         i32::pow(2, zoom)
     }
+}
+
+//TODO include width and height of view rect to determine visibility
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct View {
+    pub source_id: TileSourceId,
+    pub zoom: u32,
+    pub center: MapCoord,
 }
