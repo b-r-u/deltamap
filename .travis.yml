@@ -1,0 +1,14 @@
+language: rust
+rust:
+  - stable
+  - nightly
+cache: cargo
+dist: trusty
+sudo: false
+addons:
+  apt:
+    packages:
+    - libxxf86vm-dev
+    - libosmesa6-dev
+script:
+  - cargo build
