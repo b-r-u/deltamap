@@ -36,7 +36,7 @@ impl<'a> MapViewGl<'a> {
             let mut tex = Texture::empty(cx, 2048, 2048, TextureFormat::Rgb8);
             check_gl_errors!(cx);
             {
-                let img = image::open("no_tile.png").unwrap();
+                let img = image::open("img/no_tile.png").unwrap();
                 tex.sub_image(0, 0, &img);
                 check_gl_errors!(cx);
             }
