@@ -63,7 +63,7 @@ impl TileLoader {
                 let arc_request_rx = Arc::clone(&arc_request_rx);
                 let result_tx = result_tx.clone();
                 let arc_notice_func = Arc::clone(&arc_notice_func);
-                thread::spawn(move || Self::work_remote(id, remote_queue, arc_request_rx, result_tx, arc_notice_func));
+                thread::spawn(move || Self::work_remote(id, &remote_queue, &arc_request_rx, &result_tx, &arc_notice_func));
             }
         }
 
@@ -147,10 +147,10 @@ impl TileLoader {
 
     fn work_remote<F>(
         thread_id: u32,
-        queue: Arc<Mutex<Vec<TileRequest>>>,
-        request_rx: Arc<Mutex<mpsc::Receiver<RemoteLoaderMessage>>>,
-        result_tx: mpsc::Sender<(Tile, Option<DynamicImage>)>,
-        notice_func: Arc<F>,
+        queue: &Arc<Mutex<Vec<TileRequest>>>,
+        request_rx: &Arc<Mutex<mpsc::Receiver<RemoteLoaderMessage>>>,
+        result_tx: &mpsc::Sender<(Tile, Option<DynamicImage>)>,
+        notice_func: &Arc<F>,
     )
         where F: Fn(Tile) + Sync + Send + 'static,
     {
@@ -159,8 +159,7 @@ impl TileLoader {
         loop {
             let message = request_rx.lock().ok().and_then(|r| r.recv().ok());
             match message {
-                None => break,
-                Some(RemoteLoaderMessage::Terminate) => break,
+                None | Some(RemoteLoaderMessage::Terminate) => break,
                 Some(RemoteLoaderMessage::PopQueue) => {
                     let ele: Option<TileRequest> = queue.lock().ok().and_then(|mut q| q.pop());
 
@@ -172,22 +171,27 @@ impl TileLoader {
 
                         if let Some(Ok(mut response)) = client_opt.as_ref().map(|c| c.get(&request.url).send()) {
                             let mut buf: Vec<u8> = vec![];
-                            response.copy_to(&mut buf).unwrap();
-                            if let Ok(img) = image::load_from_memory(&buf) {
-                                if result_tx.send((request.tile, Some(img))).is_err() {
-                                    break;
+                            if response.copy_to(&mut buf).is_ok() {
+                                if let Ok(img) = image::load_from_memory(&buf) {
+                                    // successfully loaded tile
+
+                                    if result_tx.send((request.tile, Some(img))).is_err() {
+                                        break;
+                                    }
+
+                                    notice_func(request.tile);
+
+                                    if request.write_to_file {
+                                        //TODO do something on write errors
+                                        let _ = Self::write_to_file(&request.path, &buf);
+                                    }
+
+                                    continue;
                                 }
-
-                                notice_func(request.tile);
-
-                                if request.write_to_file {
-                                    //TODO do something on write errors
-                                    let _ = Self::write_to_file(&request.path, &buf);
-                                }
-
-                                continue;
                             }
                         }
+
+                        // failed not load tile
                         if result_tx.send((request.tile, None)).is_err() {
                             break;
                         }
@@ -205,15 +209,17 @@ impl TileLoader {
         let tile = Tile::new(tile_coord, source.id());
 
         if !self.pending.contains(&tile) {
-            self.pending.insert(tile);
-            self.request_tx.send(LoaderMessage::GetTile(
-                TileRequest {
-                    tile: tile,
-                    url: source.remote_tile_url(tile_coord),
-                    path: source.local_tile_path(tile_coord),
-                    write_to_file: write_to_file,
-                }
-            )).unwrap();
+            if self.request_tx.send(LoaderMessage::GetTile(
+                    TileRequest {
+                        tile: tile,
+                        url: source.remote_tile_url(tile_coord),
+                        path: source.local_tile_path(tile_coord),
+                        write_to_file: write_to_file,
+                    }
+                )).is_ok()
+            {
+                self.pending.insert(tile);
+            }
         }
     }
 
@@ -245,28 +251,24 @@ impl TileLoader {
                 if let Some(ref client) = self.client {
                     if let Ok(mut response) = client.get(&source.remote_tile_url(tile)).send() {
                         let mut buf: Vec<u8> = vec![];
-                        response.copy_to(&mut buf).unwrap();
-                        if let Ok(img) = image::load_from_memory(&buf) {
-                            if write_to_file {
-                                let path = source.local_tile_path(tile);
-                                let _ = Self::write_to_file(path, &buf);
+                        if response.copy_to(&mut buf).is_ok() {
+                            if let Ok(img) = image::load_from_memory(&buf) {
+                                if write_to_file {
+                                    let path = source.local_tile_path(tile);
+                                    let _ = Self::write_to_file(path, &buf);
+                                }
+                                return Some(img);
                             }
-                            Some(img)
-                        } else {
-                            None
                         }
-                    } else {
-                        None
                     }
-                } else {
-                    None
                 }
+                None
             },
         }
     }
 
     pub fn set_view_location(&mut self, view: View) {
-        self.request_tx.send(LoaderMessage::SetView(view)).unwrap();
+        let _ = self.request_tx.send(LoaderMessage::SetView(view));
     }
 
     fn write_to_file<P: AsRef<Path>>(path: P, img_data: &[u8]) -> ::std::io::Result<()> {
