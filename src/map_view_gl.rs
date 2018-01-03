@@ -27,8 +27,6 @@ impl<'a> MapViewGl<'a> {
     pub fn new<F>(cx: &Context, initial_size: (u32, u32), update_func: F) -> MapViewGl
         where F: Fn() + Sync + Send + 'static,
     {
-        println!("version: {}", cx.gl_version());
-        println!("max texture size: {}", cx.max_texture_size());
         unsafe {
             let mut program = Program::from_paths(cx, "shader/map.vert", "shader/map.frag");
 

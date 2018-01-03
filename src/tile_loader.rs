@@ -164,7 +164,6 @@ impl TileLoader {
                     let ele: Option<TileRequest> = queue.lock().ok().and_then(|mut q| q.pop());
 
                     if let Some(request) = ele {
-                        println!("thread {}: queue {:?} {:?}", thread_id, request.tile, request.path);
                         if client_opt.is_none() {
                             client_opt = Client::builder().build().ok();
                         }

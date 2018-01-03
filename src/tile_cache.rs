@@ -66,7 +66,6 @@ impl TileCache {
             }
 
             self.map.insert(t, img);
-            println!("CACHE SIZE: {} tiles", self.map.len());
         }
 
         let tile = Tile::new(tile_coord, source.id());

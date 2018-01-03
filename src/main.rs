@@ -38,10 +38,6 @@ use std::time::{Duration, Instant};
 #[cfg(target_os = "android")]
 android_start!(main);
 
-fn resize_callback(width: u32, height: u32) {
-    println!("Window resized to {}x{}", width, height);
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Action {
     Nothing,
@@ -171,17 +167,23 @@ fn main() {
 
     let mut window = glutin::WindowBuilder::new().build().unwrap();
     window.set_title(&("DeltaMap - ".to_string() + sources.current_name()));
-    window.set_window_resize_callback(Some(resize_callback as fn(u32, u32)));
+
+    //TODO Find a safe way to trigger a redraw from a resize callback.
+    //TODO The callback is only allowed to access static content.
+    window.set_window_resize_callback(None);
+
     let _ = unsafe { window.make_current() };
-
-    let proxy = window.create_window_proxy();
-
     let cx = context::Context::from_window(&window);
-    let mut map = map_view_gl::MapViewGl::new(
-        &cx,
-        window.get_inner_size_pixels().unwrap(),
-        move || { proxy.wakeup_event_loop(); },
-    );
+
+    let mut map = {
+        let proxy = window.create_window_proxy();
+
+        map_view_gl::MapViewGl::new(
+            &cx,
+            window.get_inner_size_pixels().unwrap(),
+            move || { proxy.wakeup_event_loop(); },
+        )
+    };
 
     let mut input_state = InputState {
         mouse_position: (0, 0),
@@ -193,7 +195,6 @@ fn main() {
     let mut last_draw = Instant::now();
 
     'outer: for event in window.wait_events() {
-        let mut start_loop = Instant::now();
         let start_source_id = sources.current().id();
 
         let mut redraw = false;
@@ -221,7 +222,6 @@ fn main() {
             if diff + draw_dur * 2 < milli16 {
                 if let Some(dur) = milli16.checked_sub(draw_dur * 2) {
                     std::thread::sleep(dur);
-                    println!("SLEEP {}", dur.as_secs() as f64 + f64::from(dur.subsec_nanos()) * 1e-9);
 
                     for event in window.poll_events() {
                         match handle_event(event, &mut map, &mut input_state, &mut sources) {
@@ -244,9 +244,6 @@ fn main() {
             let _ = window.swap_buffers();
 
             last_draw = Instant::now();
-
-            let diff = start_loop.elapsed();
-            println!("EVENT LOOP SECS {}", diff.as_secs() as f64 + f64::from(diff.subsec_nanos()) * 1e-9);
         }
 
         // set window title
