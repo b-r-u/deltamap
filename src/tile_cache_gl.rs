@@ -1,4 +1,4 @@
-use coord::{ScreenRect, SubTileCoord, TileCoord};
+use coord::{ScreenRect, SubTileCoord, TileCoord, TextureRect};
 use linked_hash_map::LinkedHashMap;
 use map_view::VisibleTile;
 use std::collections::HashMap;
@@ -7,37 +7,6 @@ use texture::Texture;
 use tile::Tile;
 use tile_cache::TileCache;
 use tile_source::TileSource;
-
-#[derive(Copy, Clone, Debug)]
-pub struct TextureRect {
-    pub x1: f64,
-    pub y1: f64,
-    pub x2: f64,
-    pub y2: f64,
-}
-
-impl TextureRect {
-    pub fn inset(self, margin_x: f64, margin_y: f64) -> TextureRect {
-        TextureRect {
-            x1: self.x1 + margin_x,
-            y1: self.y1 + margin_y,
-            x2: self.x2 - margin_x,
-            y2: self.y2 - margin_y,
-        }
-    }
-
-    pub fn subdivide(&self, sub_tile: &SubTileCoord) -> TextureRect {
-        let scale = 1.0 / f64::from(sub_tile.size);
-        let w = (self.x2 - self.x1) * scale;
-        let h = (self.y2 - self.y1) * scale;
-        TextureRect {
-            x1: self.x1 + f64::from(sub_tile.x) * w,
-            y1: self.y1 + f64::from(sub_tile.y) * h,
-            x2: self.x1 + f64::from(sub_tile.x + 1) * w,
-            y2: self.y1 + f64::from(sub_tile.y + 1) * h,
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct TexturedVisibleTile {
