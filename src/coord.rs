@@ -103,11 +103,18 @@ pub struct ScreenRect {
     pub height: f64,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TileCoord {
-    pub zoom: u32,
-    pub x: i32,
-    pub y: i32,
+impl ScreenRect {
+    pub fn subdivide(&self, sub_tile: &SubTileCoord) -> ScreenRect {
+        let scale = 1.0 / f64::from(sub_tile.size);
+        let w = self.width * scale;
+        let h = self.height * scale;
+        ScreenRect {
+            x: self.x + f64::from(sub_tile.x) * w,
+            y: self.y + f64::from(sub_tile.y) * h,
+            width: w,
+            height: h,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -115,6 +122,23 @@ pub struct SubTileCoord {
     pub size: u32,
     pub x: u32,
     pub y: u32,
+}
+
+impl SubTileCoord {
+    pub fn subdivide(&self, other: &SubTileCoord) -> SubTileCoord {
+        SubTileCoord {
+            x: self.x * other.size + other.x,
+            y: self.y * other.size + other.y,
+            size: self.size * other.size,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TileCoord {
+    pub zoom: u32,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl TileCoord {
@@ -166,6 +190,59 @@ impl TileCoord {
                 },
             ))
         }
+    }
+
+    pub fn children(&self) -> [(TileCoord, SubTileCoord); 4] {
+        [
+            (
+                TileCoord {
+                    zoom: self.zoom + 1,
+                    x: self.x * 2,
+                    y: self.y * 2,
+                },
+                SubTileCoord {
+                    size: 2,
+                    x: 0,
+                    y: 0,
+                },
+            ),
+            (
+                TileCoord {
+                    zoom: self.zoom + 1,
+                    x: self.x * 2 + 1,
+                    y: self.y * 2,
+                },
+                SubTileCoord {
+                    size: 2,
+                    x: 1,
+                    y: 0,
+                },
+            ),
+            (
+                TileCoord {
+                    zoom: self.zoom + 1,
+                    x: self.x * 2,
+                    y: self.y * 2 + 1,
+                },
+                SubTileCoord {
+                    size: 2,
+                    x: 0,
+                    y: 1,
+                },
+            ),
+            (
+                TileCoord {
+                    zoom: self.zoom + 1,
+                    x: self.x * 2 + 1,
+                    y: self.y * 2 + 1,
+                },
+                SubTileCoord {
+                    size: 2,
+                    x: 1,
+                    y: 1,
+                },
+            ),
+        ]
     }
 
     #[inline]

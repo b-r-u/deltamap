@@ -25,6 +25,18 @@ impl TextureRect {
             y2: self.y2 - margin_y,
         }
     }
+
+    pub fn subdivide(&self, sub_tile: &SubTileCoord) -> TextureRect {
+        let scale = 1.0 / f64::from(sub_tile.size);
+        let w = (self.x2 - self.x1) * scale;
+        let h = (self.y2 - self.y1) * scale;
+        TextureRect {
+            x1: self.x1 + f64::from(sub_tile.x) * w,
+            y1: self.y1 + f64::from(sub_tile.y) * h,
+            x2: self.x1 + f64::from(sub_tile.x + 1) * w,
+            y2: self.y1 + f64::from(sub_tile.y + 1) * h,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -137,9 +149,13 @@ impl<'a> TileCacheGl<'a> {
                     }
                 );
             } else {
-                // look for cached tiles in lower zoom layers
+                // exact tile not found
+
+                // default tile
                 let mut tex_sub_rect = self.slot_to_texture_rect(Self::default_slot());
                 let mut tex_rect = tex_sub_rect;
+
+                // look for cached tiles in lower zoom layers
                 for dist in 1..31 {
                     if let Some((parent_tile, sub_coord)) = vt.tile.parent(dist) {
                         if let Some(slot) = self.store(parent_tile, source, cache, false) {
@@ -147,17 +163,34 @@ impl<'a> TileCacheGl<'a> {
                             tex_rect = self.slot_to_texture_rect(slot);
                             break;
                         }
+                    } else {
+                        break;
                     }
                 }
-                tvt.push(
-                    TexturedVisibleTile {
-                        screen_rect: vt.rect,
-                        tex_rect: tex_sub_rect,
-                        tex_minmax: tex_rect.inset(inset_x, inset_y),
-                    }
-                );
-            };
 
+                // look for cached tiles in higher zoom layers
+                for &(child_tile, child_sub_coord) in &vt.tile.children() {
+                    if let Some(slot) = self.store(child_tile, source, cache, false) {
+                        let tex_rect = self.slot_to_texture_rect(slot);
+
+                        tvt.push(
+                            TexturedVisibleTile {
+                                screen_rect: vt.rect.subdivide(&child_sub_coord),
+                                tex_rect: tex_rect,
+                                tex_minmax: tex_rect.inset(inset_x, inset_y),
+                            }
+                        );
+                    } else {
+                        tvt.push(
+                            TexturedVisibleTile {
+                                screen_rect: vt.rect.subdivide(&child_sub_coord),
+                                tex_rect: tex_sub_rect.subdivide(&child_sub_coord),
+                                tex_minmax: tex_rect.inset(inset_x, inset_y),
+                            }
+                        );
+                    }
+                }
+            };
         }
 
         tvt
