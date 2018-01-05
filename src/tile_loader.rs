@@ -35,7 +35,7 @@ impl TileLoader {
 
         TileLoader {
             client: None,
-            join_handle: thread::spawn(move || Self::work(request_rx, result_tx, notice_func)),
+            join_handle: thread::spawn(move || Self::work(&request_rx, &result_tx, notice_func)),
             request_tx: request_tx,
             result_rx: result_rx,
             pending: HashSet::new(),
@@ -43,8 +43,8 @@ impl TileLoader {
     }
 
     fn work<F>(
-        request_rx: mpsc::Receiver<LoaderMessage>,
-        result_tx: mpsc::Sender<(Tile, Option<DynamicImage>)>,
+        request_rx: &mpsc::Receiver<LoaderMessage>,
+        result_tx: &mpsc::Sender<(Tile, Option<DynamicImage>)>,
         notice_func: F,
     )
         where F: Fn(Tile) + Sync + Send + 'static,
@@ -118,7 +118,7 @@ impl TileLoader {
                     Some(request) => {
                         match image::open(&request.path) {
                             Ok(img) => {
-                                if let Err(_) = result_tx.send((request.tile, Some(img))) {
+                                if result_tx.send((request.tile, Some(img))).is_err() {
                                     break 'outer;
                                 }
                                 arc_notice_func(request.tile);
@@ -207,18 +207,17 @@ impl TileLoader {
 
         let tile = Tile::new(tile_coord, source.id());
 
-        if !self.pending.contains(&tile) {
-            if self.request_tx.send(LoaderMessage::GetTile(
-                    TileRequest {
-                        tile: tile,
-                        url: source.remote_tile_url(tile_coord),
-                        path: source.local_tile_path(tile_coord),
-                        write_to_file: write_to_file,
-                    }
-                )).is_ok()
-            {
-                self.pending.insert(tile);
-            }
+        if !self.pending.contains(&tile) &&
+            self.request_tx.send(LoaderMessage::GetTile(
+                TileRequest {
+                    tile: tile,
+                    url: source.remote_tile_url(tile_coord),
+                    path: source.local_tile_path(tile_coord),
+                    write_to_file: write_to_file,
+                }
+            )).is_ok()
+        {
+            self.pending.insert(tile);
         }
     }
 

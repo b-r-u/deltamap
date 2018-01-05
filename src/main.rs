@@ -51,8 +51,8 @@ struct InputState {
     mouse_pressed: bool,
 }
 
-fn handle_event(event: Event, map: &mut MapViewGl, input_state: &mut InputState, sources: &mut TileSources) -> Action {
-    match event {
+fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState, sources: &mut TileSources) -> Action {
+    match *event {
         Event::Closed => Action::Close,
         Event::Awakened => Action::Redraw,
         Event::MouseInput(ElementState::Pressed, MouseButton::Left, position) => {
@@ -199,7 +199,7 @@ fn main() {
 
         let mut redraw = false;
 
-        match handle_event(event, &mut map, &mut input_state, &mut sources) {
+        match handle_event(&event, &mut map, &mut input_state, &mut sources) {
             Action::Close => break 'outer,
             Action::Redraw => {
                 redraw = true;
@@ -208,7 +208,7 @@ fn main() {
         }
 
         for event in window.poll_events() {
-            match handle_event(event, &mut map, &mut input_state, &mut sources) {
+            match handle_event(&event, &mut map, &mut input_state, &mut sources) {
                 Action::Close => break 'outer,
                 Action::Redraw => {
                     redraw = true;
@@ -224,7 +224,7 @@ fn main() {
                     std::thread::sleep(dur);
 
                     for event in window.poll_events() {
-                        match handle_event(event, &mut map, &mut input_state, &mut sources) {
+                        match handle_event(&event, &mut map, &mut input_state, &mut sources) {
                             Action::Close => break 'outer,
                             Action::Redraw => {
                                 redraw = true;
