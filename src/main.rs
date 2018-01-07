@@ -140,11 +140,11 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
                     Action::Redraw
                 },
                 VirtualKeyCode::Add => {
-                    map.zoom(0.25);
+                    map.step_zoom(1, 0.5);
                     Action::Redraw
                 },
                 VirtualKeyCode::Subtract => {
-                    map.zoom(-0.25);
+                    map.step_zoom(-1, 0.5);
                     Action::Redraw
                 },
                 _ => Action::Nothing,

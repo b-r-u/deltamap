@@ -159,6 +159,19 @@ impl<'a> MapViewGl<'a> {
         self.buf.draw(DrawMode::Triangles);
     }
 
+    pub fn step_zoom(&mut self, steps: i32, step_size: f64) {
+        let new_zoom = {
+            let z = (self.map_view.zoom2 + f64::from(steps) * step_size) / step_size;
+            if steps > 0 {
+                z.ceil() * step_size
+            } else {
+                z.floor() * step_size
+            }
+        }.max(0.0).min(22.0);
+
+        self.map_view.set_zoom(new_zoom);
+    }
+
     pub fn zoom(&mut self, zoom_delta: f64) {
         if self.map_view.zoom2 + zoom_delta < 0.0 {
             self.map_view.set_zoom(0.0);
