@@ -48,7 +48,7 @@ impl TileSource {
         path
     }
 
-    pub fn remote_tile_url(&self, tile_coord: TileCoord) -> String {
+    pub fn remote_tile_url(&self, tile_coord: TileCoord) -> Option<String> {
         Self::fill_template(&self.url_template, tile_coord)
     }
 
@@ -56,14 +56,19 @@ impl TileSource {
         self.max_zoom
     }
 
-    fn fill_template(template: &str, tile_coord: TileCoord) -> String {
+    fn fill_template(template: &str, tile_coord: TileCoord) -> Option<String> {
         let x_str = tile_coord.x.to_string();
         let y_str = tile_coord.y.to_string();
         let z_str = tile_coord.zoom.to_string();
 
         //TODO use the regex crate for templates or some other more elegant method
-        template.replacen("{x}", &x_str, 1)
-                .replacen("{y}", &y_str, 1)
-                .replacen("{z}", &z_str, 1)
+        if template.contains("{quadkey}") {
+            tile_coord.to_quadkey().map(|qk| template.replacen("{quadkey}", &qk, 1))
+        } else {
+            Some(template.replacen("{x}", &x_str, 1)
+                    .replacen("{y}", &y_str, 1)
+                    .replacen("{z}", &z_str, 1)
+                )
+        }
     }
 }

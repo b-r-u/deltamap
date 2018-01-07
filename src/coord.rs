@@ -59,23 +59,7 @@ impl MapCoord {
 
 }
 
-#[test]
-fn test_normalize() {
-    {
-        let a = MapCoord::new(0.0, 0.0);
-        let mut b = a.clone();
-        assert_eq!(a, b);
-        b.normalize_x();
-        assert_eq!(a, b);
-    }
-    {
-        let mut a = MapCoord::new(1.0, 1.0);
-        let b = MapCoord::new(0.0, 1.0);
-        a.normalize_x();
-        assert_eq!(a, b);
-    }
-}
-
+/// A position on the screen in pixels. Top-left corner is (0.0, 0.0).
 #[derive(Copy, Clone, Debug)]
 pub struct ScreenCoord {
     pub x: f64,
@@ -95,6 +79,7 @@ impl ScreenCoord {
     }
 }
 
+/// A rectangle in screen coordinates.
 #[derive(Copy, Clone, Debug)]
 pub struct ScreenRect {
     pub x: f64,
@@ -117,6 +102,9 @@ impl ScreenRect {
     }
 }
 
+/// A rectangle in texture coordinates.
+/// Top-left corner is (0.0, 0.0).
+/// Bottom-right corner is (1.0, 1.0).
 #[derive(Copy, Clone, Debug)]
 pub struct TextureRect {
     pub x1: f64,
@@ -148,6 +136,7 @@ impl TextureRect {
     }
 }
 
+/// A subdivision of a tile. `x` and `y` are in the interval [0, `size` - 1].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SubTileCoord {
     pub size: u32,
@@ -165,6 +154,10 @@ impl SubTileCoord {
     }
 }
 
+/// A tile position in a tile pyramid.
+/// Each zoom level has 2^zoom by 2^zoom tiles.
+/// `x` and `y` are allowed to be negative or >= 2^zoom but then they will not correspond to a tile
+/// and `is_on_planet` will return false.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TileCoord {
     pub zoom: u32,
@@ -287,6 +280,29 @@ impl TileCoord {
         //TODO throw error when zoom too big
         i32::pow(2, zoom)
     }
+
+    pub fn to_quadkey(&self) -> Option<String> {
+        if self.zoom == 0 || self.zoom > 30 || self.x < 0 || self.y < 0 {
+            return None;
+        }
+
+        let mut quadkey = String::with_capacity(self.zoom as usize);
+
+        let len = self.zoom;
+
+        for i in (0..len).rev() {
+            let mask: u32 = 1 << i;
+
+            match ((self.x as u32 & mask) != 0, (self.y as u32 & mask) != 0) {
+                (false, false) => quadkey.push('0'),
+                (true, false) => quadkey.push('1'),
+                (false, true) => quadkey.push('2'),
+                (true, true) => quadkey.push('3'),
+            }
+        }
+
+        Some(quadkey)
+    }
 }
 
 //TODO include width and height of view rect to determine visibility
@@ -295,4 +311,37 @@ pub struct View {
     pub source_id: TileSourceId,
     pub zoom: u32,
     pub center: MapCoord,
+}
+
+#[cfg(test)]
+mod tests {
+    use coord::*;
+
+    #[test]
+    fn normalize_mapcoord() {
+        {
+            let a = MapCoord::new(0.0, 0.0);
+            let mut b = a.clone();
+            assert_eq!(a, b);
+            b.normalize_x();
+            assert_eq!(a, b);
+        }
+        {
+            let mut a = MapCoord::new(1.0, 1.0);
+            let b = MapCoord::new(0.0, 1.0);
+            a.normalize_x();
+            assert_eq!(a, b);
+        }
+    }
+
+    #[test]
+    fn quadkey() {
+        assert_eq!(TileCoord::new(0, 0, 0).to_quadkey(), None);
+        assert_eq!(TileCoord::new(1, 0, 0).to_quadkey(), Some("0".to_string()));
+        assert_eq!(TileCoord::new(1, 1, 0).to_quadkey(), Some("1".to_string()));
+        assert_eq!(TileCoord::new(1, 0, 1).to_quadkey(), Some("2".to_string()));
+        assert_eq!(TileCoord::new(1, 1, 1).to_quadkey(), Some("3".to_string()));
+        assert_eq!(TileCoord::new(3, 1, 0).to_quadkey(), Some("001".to_string()));
+        assert_eq!(TileCoord::new(30, 0, 1).to_quadkey(), Some("000000000000000000000000000002".to_string()));
+    }
 }

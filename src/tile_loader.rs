@@ -207,17 +207,20 @@ impl TileLoader {
 
         let tile = Tile::new(tile_coord, source.id());
 
-        if !self.pending.contains(&tile) &&
-            self.request_tx.send(LoaderMessage::GetTile(
-                TileRequest {
-                    tile: tile,
-                    url: source.remote_tile_url(tile_coord),
-                    path: source.local_tile_path(tile_coord),
-                    write_to_file: write_to_file,
+        if !self.pending.contains(&tile) {
+            if let Some(url) = source.remote_tile_url(tile_coord) {
+                if self.request_tx.send(LoaderMessage::GetTile(
+                        TileRequest {
+                            tile: tile,
+                            url: url,
+                            path: source.local_tile_path(tile_coord),
+                            write_to_file: write_to_file,
+                        }
+                    )).is_ok()
+                {
+                    self.pending.insert(tile);
                 }
-            )).is_ok()
-        {
-            self.pending.insert(tile);
+            }
         }
     }
 
@@ -246,8 +249,8 @@ impl TileLoader {
                     self.client = Client::builder().build().ok();
                 }
 
-                if let Some(ref client) = self.client {
-                    if let Ok(mut response) = client.get(&source.remote_tile_url(tile)).send() {
+                if let (Some(client), Some(url)) = (self.client.as_ref(), source.remote_tile_url(tile)) {
+                    if let Ok(mut response) = client.get(&url).send() {
                         let mut buf: Vec<u8> = vec![];
                         if response.copy_to(&mut buf).is_ok() {
                             if let Ok(img) = image::load_from_memory(&buf) {
