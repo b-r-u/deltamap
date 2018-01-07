@@ -92,7 +92,7 @@ impl<'a> MapViewGl<'a> {
     pub fn draw(&mut self, source: &TileSource) {
         self.tile_cache.set_view_location(View {
             source_id: source.id(),
-            zoom: self.map_view.zoom_level(),
+            zoom: self.map_view.render_zoom_level(),
             center: self.map_view.center,
         });
 
