@@ -1,15 +1,7 @@
-#[cfg(target_os = "android")]
-#[macro_use]
-extern crate android_glue;
-
-#[macro_use]
-extern crate serde_derive;
-
 extern crate glutin;
 extern crate image;
 extern crate linked_hash_map;
 extern crate reqwest;
-extern crate serde;
 extern crate toml;
 
 
@@ -32,8 +24,8 @@ mod tile_source;
 use coord::ScreenCoord;
 use glutin::{ElementState, Event, MouseButton, MouseScrollDelta, VirtualKeyCode};
 use map_view_gl::MapViewGl;
-use tile_source::TileSource;
 use std::time::{Duration, Instant};
+use tile_source::TileSource;
 
 #[cfg(target_os = "android")]
 android_start!(main);
@@ -253,13 +245,13 @@ fn main() {
     }
 }
 
-struct TileSources {
+struct TileSources<'a> {
     current_index: usize,
-    sources: Vec<(String, TileSource)>,
+    sources: &'a [(String, TileSource)],
 }
 
-impl TileSources {
-    pub fn new(sources: Vec<(String, TileSource)>) -> Option<TileSources> {
+impl<'a> TileSources<'a> {
+    pub fn new(sources: &'a [(String, TileSource)]) -> Option<TileSources> {
         if sources.is_empty() {
             None
         } else {
