@@ -1,10 +1,10 @@
+extern crate clap;
 extern crate glutin;
 extern crate image;
 extern crate linked_hash_map;
 extern crate reqwest;
 extern crate toml;
 extern crate xdg;
-
 
 #[macro_use]
 mod context;
@@ -22,14 +22,16 @@ mod tile_cache_gl;
 mod tile_loader;
 mod tile_source;
 
+use clap::Arg;
 use coord::ScreenCoord;
 use glutin::{ElementState, Event, MouseButton, MouseScrollDelta, VirtualKeyCode};
 use map_view_gl::MapViewGl;
 use std::time::{Duration, Instant};
 use tile_source::TileSource;
 
-#[cfg(target_os = "android")]
-android_start!(main);
+
+static VERSION: &'static str = "0.1.0";
+
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Action {
@@ -155,7 +157,24 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
 }
 
 fn main() {
-    let config = config::Config::load().unwrap();
+    let matches = clap::App::new("DeltaMap")
+        .version(VERSION)
+        .author("Johannes Hofmann <mail@b-r-u.org>")
+        .about("A map viewer")
+        .arg(Arg::with_name("config")
+            .short("c")
+            .long("config")
+            .value_name("FILE")
+            .help("Set a custom config file")
+            .takes_value(true))
+        .get_matches();
+
+    let config = if let Some(config_path) = matches.value_of_os("config") {
+            config::Config::from_toml_file(config_path).unwrap()
+        } else {
+            config::Config::load().unwrap()
+        };
+
     let mut sources = TileSources::new(config.tile_sources()).unwrap();
 
     let mut window = glutin::WindowBuilder::new().build().unwrap();

@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Johannes Hofmann <mail@b-r-u.org>"]
 
 [dependencies]
+clap = "2.29"
 gl = "0.9"
 image = "0.18"
 linked-hash-map = "0.5.0"
