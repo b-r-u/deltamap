@@ -19,21 +19,23 @@ impl Config {
     pub fn load() -> Result<Config, String> {
         if let Ok(xdg_dirs) = xdg::BaseDirectories::with_prefix("deltamap") {
             if let Some(config_path) = xdg_dirs.find_config_file("config.toml") {
-                println!("Load config from path {:?}", config_path);
+                info!("load config from path {:?}", config_path);
 
                 Config::from_toml_file(config_path)
             } else {
                 // try to write a default config file
                 if let Ok(path) = xdg_dirs.place_config_file("config.toml") {
                     if let Ok(mut file) = File::create(&path) {
-                        println!("write default config {:?}", &path);
-                        let _ = file.write_all(DEFAULT_CONFIG.as_bytes());
+                        if file.write_all(DEFAULT_CONFIG.as_bytes()).is_ok() {
+                            info!("write default config to {:?}", &path);
+                        }
                     }
                 }
 
                 Config::from_toml_str(DEFAULT_CONFIG)
             }
         } else {
+            info!("load default config");
             Config::from_toml_str(DEFAULT_CONFIG)
         }
     }

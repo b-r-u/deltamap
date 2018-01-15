@@ -2,12 +2,21 @@
 name = "deltamap"
 version = "0.1.0"
 authors = ["Johannes Hofmann <mail@b-r-u.org>"]
+readme = "README.md"
+repository = "https://github.com/b-r-u/deltamap"
+homepage = "https://github.com/b-r-u/deltamap"
+description = """
+A simple map viewer
+"""
+license = "GPL-3.0"
 
 [dependencies]
 clap = "2.29"
+env_logger = "0.5.0-rc.2"
 gl = "0.9"
 image = "0.18"
 linked-hash-map = "0.5.0"
+log = "0.4"
 osmpbf = "0.1"
 reqwest = "0.8"
 servo-glutin = "0.13"

@@ -168,6 +168,8 @@ impl TileLoader {
                             client_opt = Client::builder().build().ok();
                         }
 
+                        info!("thread {}, download {:?}", thread_id, request.url);
+
                         if let Some(Ok(mut response)) = client_opt.as_ref().map(|c| c.get(&request.url).send()) {
                             let mut buf: Vec<u8> = vec![];
                             if response.copy_to(&mut buf).is_ok() {
@@ -191,6 +193,7 @@ impl TileLoader {
                         }
 
                         // failed not load tile
+                        info!("thread {}, fail {:?}", thread_id, request.url);
                         if result_tx.send((request.tile, None)).is_err() {
                             break;
                         }

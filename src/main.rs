@@ -1,7 +1,11 @@
+#[macro_use]
 extern crate clap;
+extern crate env_logger;
 extern crate glutin;
 extern crate image;
 extern crate linked_hash_map;
+#[macro_use]
+extern crate log;
 extern crate reqwest;
 extern crate toml;
 extern crate xdg;
@@ -28,9 +32,6 @@ use glutin::{ElementState, Event, MouseButton, MouseScrollDelta, VirtualKeyCode}
 use map_view_gl::MapViewGl;
 use std::time::{Duration, Instant};
 use tile_source::TileSource;
-
-
-static VERSION: &'static str = "0.1.0";
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -157,10 +158,12 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
 }
 
 fn main() {
+    env_logger::init();
+
     let matches = clap::App::new("DeltaMap")
-        .version(VERSION)
-        .author("Johannes Hofmann <mail@b-r-u.org>")
-        .about("A map viewer")
+        .version(crate_version!())
+        .author(crate_authors!())
+        .about(crate_description!())
         .arg(Arg::with_name("config")
             .short("c")
             .long("config")

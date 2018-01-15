@@ -149,15 +149,15 @@ unsafe fn check_link_errors(cx: &Context, program_obj: u32)
         match cx.gl.GetError() {
             context::gl::NO_ERROR => (),
             context::gl::INVALID_VALUE => {
-                println!("invalid value");
+                error!("invalid value");
                 return;
             },
             context::gl::INVALID_OPERATION => {
-                println!("invalid operation");
+                error!("invalid operation");
                 return;
             },
             _ => {
-                println!("unknown error");
+                error!("unknown error");
                 return;
             }
         };
@@ -174,7 +174,7 @@ unsafe fn check_link_errors(cx: &Context, program_obj: u32)
         error_log.set_len(error_log_size as usize);
 
         let msg = String::from_utf8(error_log).unwrap();
-        println!("{}", msg);
+        error!("{}", msg);
     }
 }
 
@@ -197,7 +197,7 @@ unsafe fn check_compile_errors(cx: &Context, shader_obj: u32) {
         error_log.set_len(error_log_size as usize);
 
         if let Ok(msg) = String::from_utf8(error_log) {
-            println!("{}", msg);
+            error!("{}", msg);
         }
     }
 }

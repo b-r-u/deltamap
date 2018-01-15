@@ -29,8 +29,12 @@ macro_rules! check_gl_errors {
 impl Context {
     pub fn from_window(window: &glutin::Window) -> Context {
         let gl = gl::Gl::load_with(|ptr| window.get_proc_address(ptr) as *const _);
+        let cx = Context {gl: gl};
 
-        Context {gl: gl}
+        info!("OpenGL version: {}", cx.gl_version());
+        debug!("MAX_TEXTURE_SIZE: {}", cx.max_texture_size());
+
+        cx
     }
 
     pub fn gl_version(&self) -> String {
@@ -53,22 +57,22 @@ impl Context {
             match self.gl.GetError() {
                 gl::NO_ERROR => break,
                 gl::INVALID_VALUE => {
-                    println!("{}:{}, invalid value error", file, line);
+                    error!("{}:{}, invalid value error", file, line);
                 },
                 gl::INVALID_ENUM => {
-                    println!("{}:{}, invalid enum error", file, line);
+                    error!("{}:{}, invalid enum error", file, line);
                 },
                 gl::INVALID_OPERATION => {
-                    println!("{}:{}, invalid operation error", file, line);
+                    error!("{}:{}, invalid operation error", file, line);
                 },
                 gl::INVALID_FRAMEBUFFER_OPERATION => {
-                    println!("{}:{}, invalid framebuffer operation error", file, line);
+                    error!("{}:{}, invalid framebuffer operation error", file, line);
                 },
                 gl::OUT_OF_MEMORY => {
-                    println!("{}:{}, out of memory error", file, line);
+                    error!("{}:{}, out of memory error", file, line);
                 },
                 x => {
-                    println!("{}:{}, unknown error {}", file, line, x);
+                    error!("{}:{}, unknown error {}", file, line, x);
                 },
             }
         }
