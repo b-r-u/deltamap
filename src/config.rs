@@ -27,7 +27,7 @@ impl Config {
                 if let Ok(path) = xdg_dirs.place_config_file("config.toml") {
                     if let Ok(mut file) = File::create(&path) {
                         println!("write default config {:?}", &path);
-                        file.write_all(DEFAULT_CONFIG.as_bytes());
+                        let _ = file.write_all(DEFAULT_CONFIG.as_bytes());
                     }
                 }
 
@@ -95,7 +95,7 @@ impl Config {
                         .as_str()
                         .ok_or_else(|| "extension has to be a string".to_string())?;
 
-                    if name.contains("/") || name.contains("\\") {
+                    if name.contains('/') || name.contains('\\') {
                         return Err(format!("source name ({:?}) must not contain slashes (\"/\" or \"\\\")", name));
                     }
 
