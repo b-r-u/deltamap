@@ -9,8 +9,9 @@ use xdg;
 static DEFAULT_CONFIG: &'static str = include_str!("../default_config.toml");
 
 
+#[derive(Debug)]
 pub struct Config {
-    tile_cache_dir: String,
+    tile_cache_dir: PathBuf,
     sources: Vec<(String, TileSource)>,
 }
 
@@ -22,6 +23,7 @@ impl Config {
 
                 Config::from_toml_file(config_path)
             } else {
+                // try to write a default config file
                 if let Ok(path) = xdg_dirs.place_config_file("config.toml") {
                     if let Ok(mut file) = File::create(&path) {
                         println!("write default config {:?}", &path);
@@ -36,18 +38,37 @@ impl Config {
         }
     }
 
+    /// Returns a tile cache directory path at a standard XDG cache location. The returned path may
+    /// not exist.
+    fn default_tile_cache_dir() -> Result<PathBuf, String> {
+        let xdg_dirs = xdg::BaseDirectories::with_prefix("deltamap")
+            .map_err(|e| e.description().to_string())?;
+
+        match xdg_dirs.find_cache_file("tiles") {
+            Some(dir) => Ok(dir),
+            None => Ok(xdg_dirs.get_cache_home().join("tiles")),
+        }
+    }
+
     pub fn from_toml_str(toml_str: &str) -> Result<Config, String> {
         match toml_str.parse::<Value>() {
             Ok(Value::Table(ref table)) => {
-                let tile_cache_dir = table.get("tile_cache_dir")
-                    .ok_or_else(|| "missing \"tile_cache_dir\" entry".to_string())?
-                    .as_str()
-                    .ok_or_else(|| "tile_cache_dir has to be a string".to_string())?;
+                let tile_cache_dir = {
+                    match table.get("tile_cache_dir") {
+                        Some(dir) => {
+                            PathBuf::from(
+                                dir.as_str()
+                                   .ok_or_else(|| "tile_cache_dir has to be a string".to_string())?
+                            )
+                        },
+                        None => Config::default_tile_cache_dir()?,
+                    }
+                };
 
-                let sources_table = table.get("sources")
-                    .ok_or_else(|| "missing \"sources\" table".to_string())?
+                let sources_table = table.get("tile_sources")
+                    .ok_or_else(|| "missing \"tile_sources\" table".to_string())?
                     .as_table()
-                    .ok_or_else(|| "\"sources\" has to be a table".to_string())?;
+                    .ok_or_else(|| "\"tile_sources\" has to be a table".to_string())?;
 
                 let mut sources_vec: Vec<(String, TileSource)> = Vec::with_capacity(sources_table.len());
 
@@ -95,7 +116,7 @@ impl Config {
 
                 Ok(
                     Config {
-                        tile_cache_dir: tile_cache_dir.to_string(),
+                        tile_cache_dir: tile_cache_dir,
                         sources: sources_vec,
                     }
                 )
@@ -116,5 +137,15 @@ impl Config {
 
     pub fn tile_sources(&self) -> &[(String, TileSource)] {
         &self.sources
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::*;
+
+    #[test]
+    fn default_config() {
+        assert!(Config::from_toml_str(DEFAULT_CONFIG).is_ok())
     }
 }
