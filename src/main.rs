@@ -3,6 +3,7 @@ extern crate image;
 extern crate linked_hash_map;
 extern crate reqwest;
 extern crate toml;
+extern crate xdg;
 
 
 #[macro_use]
@@ -154,7 +155,7 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
 }
 
 fn main() {
-    let config = config::Config::from_toml("deltamap.toml").unwrap();
+    let config = config::Config::load().unwrap();
     let mut sources = TileSources::new(config.tile_sources()).unwrap();
 
     let mut window = glutin::WindowBuilder::new().build().unwrap();

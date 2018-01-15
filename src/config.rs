@@ -1,9 +1,12 @@
 use std::error::Error;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use tile_source::TileSource;
 use toml::Value;
+use xdg;
+
+static DEFAULT_CONFIG: &'static str = include_str!("../default_config.toml");
 
 
 pub struct Config {
@@ -12,13 +15,29 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_toml<P: AsRef<Path>>(path: P) -> Result<Config, String> {
-        let mut file = File::open(path).map_err(|e| e.description().to_string())?;
+    pub fn load() -> Result<Config, String> {
+        if let Ok(xdg_dirs) = xdg::BaseDirectories::with_prefix("deltamap") {
+            if let Some(config_path) = xdg_dirs.find_config_file("config.toml") {
+                println!("Load config from path {:?}", config_path);
 
-        let mut content = String::new();
-        file.read_to_string(&mut content).map_err(|e| e.description().to_string())?;
+                Config::from_toml_file(config_path)
+            } else {
+                if let Ok(path) = xdg_dirs.place_config_file("config.toml") {
+                    if let Ok(mut file) = File::create(&path) {
+                        println!("write default config {:?}", &path);
+                        file.write_all(DEFAULT_CONFIG.as_bytes());
+                    }
+                }
 
-        match content.parse::<Value>() {
+                Config::from_toml_str(DEFAULT_CONFIG)
+            }
+        } else {
+            Config::from_toml_str(DEFAULT_CONFIG)
+        }
+    }
+
+    pub fn from_toml_str(toml_str: &str) -> Result<Config, String> {
+        match toml_str.parse::<Value>() {
             Ok(Value::Table(ref table)) => {
                 let tile_cache_dir = table.get("tile_cache_dir")
                     .ok_or_else(|| "missing \"tile_cache_dir\" entry".to_string())?
@@ -39,7 +58,7 @@ impl Config {
                         .ok_or_else(|| "max_zoom has to be an integer".to_string())
                         .and_then(|m| {
                             if m <= 0 || m > 30 {
-                                Err(format!("max_zoom = {} is out of bounds. Has to be in interval [1, 30].", m))
+                                Err(format!("max_zoom = {} is out of bounds, has to be in interval [1, 30]", m))
                             } else {
                                 Ok(m)
                             }
@@ -84,6 +103,15 @@ impl Config {
             Ok(_) => Err("TOML file has invalid structure. Expected a Table as the top-level element.".to_string()),
             Err(e) => Err(e.description().to_string()),
         }
+    }
+
+    pub fn from_toml_file<P: AsRef<Path>>(path: P) -> Result<Config, String> {
+        let mut file = File::open(path).map_err(|e| e.description().to_string())?;
+
+        let mut content = String::new();
+        file.read_to_string(&mut content).map_err(|e| e.description().to_string())?;
+
+        Config::from_toml_str(&content)
     }
 
     pub fn tile_sources(&self) -> &[(String, TileSource)] {
