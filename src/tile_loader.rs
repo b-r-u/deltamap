@@ -5,11 +5,12 @@ use reqwest::Client;
 use std::cmp::Ordering;
 use std::cmp;
 use std::collections::hash_set::HashSet;
+use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::TryRecvError;
+use std::sync::{Arc, mpsc, Mutex};
 use std::thread;
 use tile::Tile;
 use tile_source::TileSource;
@@ -24,10 +25,11 @@ pub struct TileLoader {
     request_tx: mpsc::Sender<LoaderMessage>,
     result_rx: mpsc::Receiver<(Tile, Option<DynamicImage>)>,
     pending: HashSet<Tile>,
+    use_network: bool,
 }
 
 impl TileLoader {
-    pub fn new<F>(notice_func: F) -> Self
+    pub fn new<F>(notice_func: F, use_network: bool) -> Self
         where F: Fn(Tile) + Sync + Send + 'static,
     {
         let (request_tx, request_rx) = mpsc::channel();
@@ -35,10 +37,11 @@ impl TileLoader {
 
         TileLoader {
             client: None,
-            join_handle: thread::spawn(move || Self::work(&request_rx, &result_tx, notice_func)),
+            join_handle: thread::spawn(move || Self::work(&request_rx, &result_tx, notice_func, use_network)),
             request_tx: request_tx,
             result_rx: result_rx,
             pending: HashSet::new(),
+            use_network: use_network,
         }
     }
 
@@ -46,6 +49,7 @@ impl TileLoader {
         request_rx: &mpsc::Receiver<LoaderMessage>,
         result_tx: &mpsc::Sender<(Tile, Option<DynamicImage>)>,
         notice_func: F,
+        use_network: bool,
     )
         where F: Fn(Tile) + Sync + Send + 'static,
     {
@@ -125,17 +129,22 @@ impl TileLoader {
                                 continue;
                             },
                             Err(_) => {
-                                if let Ok(mut remote_queue) = remote_queue.lock() {
-                                    //TODO restrict size of remote_queue
-                                    remote_queue.push(request);
-                                    if let Some(view) = view_opt {
-                                        remote_queue.as_mut_slice().sort_by(|a, b| {
-                                            compare_tiles(a.tile, b.tile, view)
-                                        });
+                                if use_network {
+                                    if let Ok(mut remote_queue) = remote_queue.lock() {
+                                        //TODO restrict size of remote_queue
+                                        remote_queue.push(request);
+                                        if let Some(view) = view_opt {
+                                            remote_queue.as_mut_slice().sort_by(|a, b| {
+                                                compare_tiles(a.tile, b.tile, view)
+                                            });
+                                        }
+                                        if let Err(e) = remote_request_tx.send(RemoteLoaderMessage::PopQueue) {
+                                            //TODO what now? restart worker?
+                                            error!("remote worker terminated, {}", e.description());
+                                        }
                                     }
-                                    if remote_request_tx.send(RemoteLoaderMessage::PopQueue).is_err() {
-                                        //TODO remote worker terminated
-                                    }
+                                } else if result_tx.send((request.tile, None)).is_err() {
+                                    break 'outer;
                                 }
                             },
                         }
@@ -183,8 +192,9 @@ impl TileLoader {
                                     notice_func(request.tile);
 
                                     if request.write_to_file {
-                                        //TODO do something on write errors
-                                        let _ = Self::write_to_file(&request.path, &buf);
+                                        if let Err(e) = Self::write_to_file(&request.path, &buf) {
+                                            warn!("could not write file {}, {}", request.path.display(), e.description());
+                                        }
                                     }
 
                                     continue;
@@ -232,10 +242,12 @@ impl TileLoader {
             Err(_) => None,
             Ok((tile, None)) => {
                 self.pending.remove(&tile);
+                debug!("async_result none, pending.len: {}, {:?}", self.pending.len(), tile);
                 None
             },
             Ok((tile, Some(img))) => {
                 self.pending.remove(&tile);
+                debug!("async_result some, pending.len: {}, {:?}", self.pending.len(), tile);
                 Some((tile, img))
             },
         }
@@ -247,26 +259,32 @@ impl TileLoader {
                 Some(img)
             },
             Err(_) => {
-                //TODO do not try to create a client every time when it failed before
-                if self.client.is_none() {
-                    self.client = Client::builder().build().ok();
-                }
+                if self.use_network {
+                    //TODO do not try to create a client every time when it failed before
+                    if self.client.is_none() {
+                        self.client = Client::builder().build().ok();
+                    }
 
-                if let (Some(client), Some(url)) = (self.client.as_ref(), source.remote_tile_url(tile)) {
-                    if let Ok(mut response) = client.get(&url).send() {
-                        let mut buf: Vec<u8> = vec![];
-                        if response.copy_to(&mut buf).is_ok() {
-                            if let Ok(img) = image::load_from_memory(&buf) {
-                                if write_to_file {
-                                    let path = source.local_tile_path(tile);
-                                    let _ = Self::write_to_file(path, &buf);
+                    if let (Some(client), Some(url)) = (self.client.as_ref(), source.remote_tile_url(tile)) {
+                        if let Ok(mut response) = client.get(&url).send() {
+                            let mut buf: Vec<u8> = vec![];
+                            if response.copy_to(&mut buf).is_ok() {
+                                if let Ok(img) = image::load_from_memory(&buf) {
+                                    if write_to_file {
+                                        let path = source.local_tile_path(tile);
+                                        if let Err(e) = Self::write_to_file(&path, &buf) {
+                                            warn!("could not write file {}, {}", &path.display(), e.description());
+                                        }
+                                    }
+                                    return Some(img);
                                 }
-                                return Some(img);
                             }
                         }
                     }
+                    None
+                } else {
+                    None
                 }
-                None
             },
         }
     }

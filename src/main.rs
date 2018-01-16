@@ -170,6 +170,9 @@ fn main() {
             .value_name("FILE")
             .help("Set a custom config file")
             .takes_value(true))
+        .arg(Arg::with_name("offline")
+            .long("offline")
+            .help("Do not use the network"))
         .get_matches();
 
     let config = if let Some(config_path) = matches.value_of_os("config") {
@@ -197,6 +200,7 @@ fn main() {
             &cx,
             window.get_inner_size_pixels().unwrap(),
             move || { proxy.wakeup_event_loop(); },
+            !matches.is_present("offline")
         )
     };
 

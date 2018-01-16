@@ -13,13 +13,16 @@ pub struct TileCache {
 }
 
 impl TileCache {
-    pub fn new<F>(new_tile_func: F) -> Self
+    pub fn new<F>(new_tile_func: F, use_network: bool) -> Self
         where F: Fn(Tile) + Sync + Send + 'static,
     {
         TileCache {
-            loader: TileLoader::new(move |tile| {
-                new_tile_func(tile);
-            }),
+            loader: TileLoader::new(
+                move |tile| {
+                    new_tile_func(tile);
+                },
+                use_network,
+            ),
             map: LinkedHashMap::new(),
             max_tiles: 512, //TODO set a reasonable value
         }
