@@ -30,6 +30,7 @@ use clap::Arg;
 use coord::ScreenCoord;
 use glutin::{ElementState, Event, MouseButton, MouseScrollDelta, VirtualKeyCode};
 use map_view_gl::MapViewGl;
+use std::error::Error;
 use std::time::{Duration, Instant};
 use tile_source::TileSource;
 
@@ -170,6 +171,17 @@ fn main() {
             .value_name("FILE")
             .help("Set a custom config file")
             .takes_value(true))
+        .arg(Arg::with_name("fps")
+            .long("fps")
+            .value_name("FPS")
+            .validator(|s| {
+                s.parse::<f64>()
+                    .map(|_| ())
+                    .map_err(|e| e.description().to_string())
+            })
+            .help("Set target frames per second (default is 60). \
+                  This should equal the refresh rate of the display.")
+            .takes_value(true))
         .arg(Arg::with_name("offline")
             .long("offline")
             .help("Do not use the network"))
@@ -209,7 +221,12 @@ fn main() {
         mouse_pressed: false,
     };
 
-    let milli16 = Duration::from_millis(16);
+    let fps: f64 = matches.value_of("fps").map(|s| s.parse().unwrap()).unwrap_or(config.fps());
+    let duration_per_frame = Duration::from_millis((1000.0 / fps - 0.5).max(0.0).floor() as u64);
+    info!("milliseconds per frame: {}",
+          duration_per_frame.as_secs() as f64 * 1000.0
+          + duration_per_frame.subsec_nanos() as f64 * 1e-6);
+
     let mut draw_dur = Duration::from_millis(8);
     let mut last_draw = Instant::now();
 
@@ -238,8 +255,8 @@ fn main() {
 
         {
             let diff = last_draw.elapsed();
-            if diff + draw_dur * 2 < milli16 {
-                if let Some(dur) = milli16.checked_sub(draw_dur * 2) {
+            if diff + draw_dur * 2 < duration_per_frame {
+                if let Some(dur) = duration_per_frame.checked_sub(draw_dur * 2) {
                     std::thread::sleep(dur);
 
                     for event in window.poll_events() {

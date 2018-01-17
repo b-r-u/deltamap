@@ -13,6 +13,7 @@ static DEFAULT_CONFIG: &'static str = include_str!("../default_config.toml");
 pub struct Config {
     tile_cache_dir: PathBuf,
     sources: Vec<(String, TileSource)>,
+    fps: f64,
 }
 
 impl Config {
@@ -64,6 +65,15 @@ impl Config {
                             )
                         },
                         None => Config::default_tile_cache_dir()?,
+                    }
+                };
+
+                let fps = {
+                    match table.get("fps") {
+                        Some(&Value::Float(fps)) => fps,
+                        Some(&Value::Integer(fps)) => fps as f64,
+                        Some(_) => return Err("fps has to be an integer or a float.".to_string()),
+                        None => 60.0,
                     }
                 };
 
@@ -120,6 +130,7 @@ impl Config {
                     Config {
                         tile_cache_dir: tile_cache_dir,
                         sources: sources_vec,
+                        fps: fps,
                     }
                 )
             },
@@ -139,6 +150,10 @@ impl Config {
 
     pub fn tile_sources(&self) -> &[(String, TileSource)] {
         &self.sources
+    }
+
+    pub fn fps(&self) -> f64 {
+        self.fps
     }
 }
 
