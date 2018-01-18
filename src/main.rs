@@ -158,6 +158,10 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
     }
 }
 
+fn dur_to_sec(dur: Duration) -> f64 {
+    dur.as_secs() as f64 + dur.subsec_nanos() as f64 * 1e-9
+}
+
 fn main() {
     env_logger::init();
 
@@ -227,12 +231,14 @@ fn main() {
           duration_per_frame.as_secs() as f64 * 1000.0
           + duration_per_frame.subsec_nanos() as f64 * 1e-6);
 
-    let mut draw_dur = Duration::from_millis(8);
+    // estimated draw duration
+    let mut est_draw_dur = duration_per_frame;
     let mut last_draw = Instant::now();
 
     'outer: for event in window.wait_events() {
-        let start_source_id = sources.current().id();
+        debug!("{:?}", &event);
 
+        let start_source_id = sources.current().id();
         let mut redraw = false;
 
         match handle_event(&event, &mut map, &mut input_state, &mut sources) {
@@ -244,6 +250,7 @@ fn main() {
         }
 
         for event in window.poll_events() {
+            debug!("{:?}", &event);
             match handle_event(&event, &mut map, &mut input_state, &mut sources) {
                 Action::Close => break 'outer,
                 Action::Redraw => {
@@ -255,11 +262,12 @@ fn main() {
 
         {
             let diff = last_draw.elapsed();
-            if diff + draw_dur * 2 < duration_per_frame {
-                if let Some(dur) = duration_per_frame.checked_sub(draw_dur * 2) {
+            if diff + est_draw_dur * 2 < duration_per_frame {
+                if let Some(dur) = duration_per_frame.checked_sub(est_draw_dur * 2) {
                     std::thread::sleep(dur);
 
                     for event in window.poll_events() {
+                        debug!("after sleep {:?}", &event);
                         match handle_event(&event, &mut map, &mut input_state, &mut sources) {
                             Action::Close => break 'outer,
                             Action::Redraw => {
@@ -275,11 +283,19 @@ fn main() {
         if redraw {
             let draw_start = Instant::now();
             map.draw(sources.current());
-            draw_dur = draw_start.elapsed();
+            let draw_dur = draw_start.elapsed();
 
             let _ = window.swap_buffers();
 
             last_draw = Instant::now();
+
+            debug!("draw: {} sec (est {} sec)", dur_to_sec(draw_dur), dur_to_sec(est_draw_dur));
+
+            est_draw_dur = if draw_dur > est_draw_dur {
+                draw_dur
+            } else {
+                (draw_dur / 4) + ((est_draw_dur / 4) * 3)
+            };
         }
 
         // set window title
