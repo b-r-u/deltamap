@@ -193,6 +193,11 @@ impl<'a> MapViewGl<'a> {
         self.map_view.center.normalize_xy();
     }
 
+    pub fn change_zoom_level_offset(&mut self, delta_offset: f64) {
+        let offset = self.map_view.render_zoom_level_offset();
+        self.map_view.set_render_zoom_level_offset(offset + delta_offset);
+    }
+
     pub fn move_pixel(&mut self, delta_x: f64, delta_y: f64) {
         self.map_view.move_pixel(delta_x, delta_y);
         self.map_view.center.normalize_xy();

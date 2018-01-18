@@ -8,6 +8,7 @@ pub struct MapView {
     pub tile_size: u32,
     pub center: MapCoord,
     pub zoom2: f64,
+    pub render_zoom_level_offset: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -24,6 +25,7 @@ impl MapView {
             tile_size: tile_size,
             center: MapCoord::new(0.5, 0.5),
             zoom2: 0.0,
+            render_zoom_level_offset: 0.0,
         }
     }
 
@@ -91,9 +93,16 @@ impl MapView {
         visible_tiles
     }
 
-    //TODO make zoom level configurable
     pub fn render_zoom_level(&self) -> u32 {
-        self.zoom2.floor().max(0.0) as u32
+        (self.zoom2 + self.render_zoom_level_offset).floor().max(0.0) as u32
+    }
+
+    pub fn render_zoom_level_offset(&self) -> f64 {
+        self.render_zoom_level_offset
+    }
+
+    pub fn set_render_zoom_level_offset(&mut self, offset: f64) {
+        self.render_zoom_level_offset = offset;
     }
 
     pub fn set_size(&mut self, width: f64, height: f64) {

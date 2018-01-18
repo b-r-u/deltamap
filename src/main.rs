@@ -46,6 +46,14 @@ enum Action {
 struct InputState {
     mouse_position: (i32, i32),
     mouse_pressed: bool,
+    lctrl_pressed: bool,
+    rctrl_pressed: bool,
+}
+
+impl InputState {
+    fn ctrl_pressed(&self) -> bool {
+        self.lctrl_pressed | self.rctrl_pressed
+    }
 }
 
 fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState, sources: &mut TileSources) -> Action {
@@ -112,6 +120,14 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
                 VirtualKeyCode::Escape => {
                     Action::Close
                 },
+                VirtualKeyCode::LControl => {
+                    input_state.lctrl_pressed = true;
+                    Action::Nothing
+                },
+                VirtualKeyCode::RControl => {
+                    input_state.rctrl_pressed = true;
+                    Action::Nothing
+                },
                 VirtualKeyCode::PageUp => {
                     sources.switch_to_prev();
                     Action::Redraw
@@ -137,12 +153,33 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
                     Action::Redraw
                 },
                 VirtualKeyCode::Add => {
-                    map.step_zoom(1, 0.5);
+                    if input_state.ctrl_pressed() {
+                        map.change_zoom_level_offset(1.0);
+                    } else {
+                        map.step_zoom(1, 0.5);
+                    }
                     Action::Redraw
                 },
                 VirtualKeyCode::Subtract => {
-                    map.step_zoom(-1, 0.5);
+                    if input_state.ctrl_pressed() {
+                        map.change_zoom_level_offset(-1.0);
+                    } else {
+                        map.step_zoom(-1, 0.5);
+                    }
                     Action::Redraw
+                },
+                _ => Action::Nothing,
+            }
+        },
+        Event::KeyboardInput(glutin::ElementState::Released, _, Some(keycode)) => {
+            match keycode {
+                VirtualKeyCode::LControl => {
+                    input_state.lctrl_pressed = false;
+                    Action::Nothing
+                },
+                VirtualKeyCode::RControl => {
+                    input_state.rctrl_pressed = false;
+                    Action::Nothing
                 },
                 _ => Action::Nothing,
             }
@@ -223,6 +260,8 @@ fn main() {
     let mut input_state = InputState {
         mouse_position: (0, 0),
         mouse_pressed: false,
+        lctrl_pressed: false,
+        rctrl_pressed: false,
     };
 
     let fps: f64 = matches.value_of("fps").map(|s| s.parse().unwrap()).unwrap_or(config.fps());
