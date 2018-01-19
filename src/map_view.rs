@@ -8,7 +8,7 @@ pub struct MapView {
     pub tile_size: u32,
     pub center: MapCoord,
     pub zoom2: f64,
-    pub render_zoom_level_offset: f64,
+    pub tile_zoom_offset: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -25,7 +25,7 @@ impl MapView {
             tile_size: tile_size,
             center: MapCoord::new(0.5, 0.5),
             zoom2: 0.0,
-            render_zoom_level_offset: 0.0,
+            tile_zoom_offset: 0.0,
         }
     }
 
@@ -55,7 +55,7 @@ impl MapView {
     }
 
     pub fn visible_tiles(&self, snap_to_pixel: bool) -> Vec<VisibleTile> {
-        let uzoom = self.render_zoom_level();
+        let uzoom = self.tile_zoom();
         let top_left_tile = self.top_left_coord().on_tile_at_zoom(uzoom);
         let mut top_left_tile_screen_coord = self.tile_screen_position(&top_left_tile);
         let tile_screen_size = f64::powf(2.0, self.zoom2 - f64::from(uzoom)) * f64::from(self.tile_size);
@@ -93,16 +93,16 @@ impl MapView {
         visible_tiles
     }
 
-    pub fn render_zoom_level(&self) -> u32 {
-        (self.zoom2 + self.render_zoom_level_offset).floor().max(0.0) as u32
+    pub fn tile_zoom(&self) -> u32 {
+        (self.zoom2 + self.tile_zoom_offset).floor().max(0.0) as u32
     }
 
-    pub fn render_zoom_level_offset(&self) -> f64 {
-        self.render_zoom_level_offset
+    pub fn tile_zoom_offset(&self) -> f64 {
+        self.tile_zoom_offset
     }
 
-    pub fn set_render_zoom_level_offset(&mut self, offset: f64) {
-        self.render_zoom_level_offset = offset;
+    pub fn set_tile_zoom_offset(&mut self, offset: f64) {
+        self.tile_zoom_offset = offset;
     }
 
     pub fn set_size(&mut self, width: f64, height: f64) {

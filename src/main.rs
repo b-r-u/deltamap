@@ -154,7 +154,7 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
                 },
                 VirtualKeyCode::Add => {
                     if input_state.ctrl_pressed() {
-                        map.change_zoom_level_offset(1.0);
+                        map.change_tile_zoom_offset(1.0);
                     } else {
                         map.step_zoom(1, 0.5);
                     }
@@ -162,7 +162,7 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
                 },
                 VirtualKeyCode::Subtract => {
                     if input_state.ctrl_pressed() {
-                        map.change_zoom_level_offset(-1.0);
+                        map.change_tile_zoom_offset(-1.0);
                     } else {
                         map.step_zoom(-1, 0.5);
                     }

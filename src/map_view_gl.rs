@@ -92,7 +92,7 @@ impl<'a> MapViewGl<'a> {
     pub fn draw(&mut self, source: &TileSource) {
         self.tile_cache.set_view_location(View {
             source_id: source.id(),
-            zoom: self.map_view.render_zoom_level(),
+            zoom: self.map_view.tile_zoom(),
             center: self.map_view.center,
         });
 
@@ -193,9 +193,9 @@ impl<'a> MapViewGl<'a> {
         self.map_view.center.normalize_xy();
     }
 
-    pub fn change_zoom_level_offset(&mut self, delta_offset: f64) {
-        let offset = self.map_view.render_zoom_level_offset();
-        self.map_view.set_render_zoom_level_offset(offset + delta_offset);
+    pub fn change_tile_zoom_offset(&mut self, delta_offset: f64) {
+        let offset = self.map_view.tile_zoom_offset();
+        self.map_view.set_tile_zoom_offset(offset + delta_offset);
     }
 
     pub fn move_pixel(&mut self, delta_x: f64, delta_y: f64) {
