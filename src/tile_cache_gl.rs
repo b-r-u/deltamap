@@ -95,21 +95,37 @@ impl<'a> TileCacheGl<'a> {
         slot
     }
 
-    pub fn textured_visible_tiles(
+    /// Finds textures from the cache for a given slice of visible tiles. The texture atlas may not
+    /// be big enough to hold all textures at once; a possible remainder of untextured visible tiles is
+    /// returned as an `Option`.
+    /// The function guarantees that no more than `max_tiles_to_use` tiles are used for texturing;
+    /// the number of used tiles is returned as an `usize`.
+    pub fn textured_visible_tiles<'b>(
         &mut self,
-        visible_tiles: &[VisibleTile],
+        visible_tiles: &'b [VisibleTile],
+        max_tiles_to_use: usize,
         source: &TileSource,
         cache: &mut TileCache,
-        ) -> Vec<TexturedVisibleTile>
+        ) -> (Vec<TexturedVisibleTile>, Option<&'b [VisibleTile]>, usize)
     {
         let mut tvt = Vec::with_capacity(visible_tiles.len());
 
         let inset_x = 0.5 / f64::from(self.texture.width());
         let inset_y = 0.5 / f64::from(self.texture.height());
 
-        for vt in visible_tiles {
+        let num_usable_slots = self.slots_lru.len();
+        // The number of actually used slots may be lower, because slots can be used multiple times
+        // in the same view (especially the default slot).
+        let mut used_slots = 0_usize;
+
+        for (i, vt) in visible_tiles.iter().enumerate() {
+            if used_slots >= num_usable_slots || used_slots >= max_tiles_to_use {
+                return (tvt, Some(&visible_tiles[i..]), used_slots);
+            }
+
             if let Some(slot) = self.store(vt.tile, source, cache, true) {
                 let tex_rect = self.slot_to_texture_rect(slot);
+                used_slots += 1;
                 tvt.push(
                     TexturedVisibleTile {
                         screen_rect: vt.rect,
@@ -120,6 +136,10 @@ impl<'a> TileCacheGl<'a> {
             } else {
                 // exact tile not found
 
+                if used_slots + 5 > num_usable_slots || used_slots + 5 > max_tiles_to_use {
+                    return (tvt, Some(&visible_tiles[i..]), used_slots);
+                }
+
                 // default tile
                 let mut tex_sub_rect = self.slot_to_texture_rect(Self::default_slot());
                 let mut tex_rect = tex_sub_rect;
@@ -128,6 +148,7 @@ impl<'a> TileCacheGl<'a> {
                 for dist in 1..31 {
                     if let Some((parent_tile, sub_coord)) = vt.tile.parent(dist) {
                         if let Some(slot) = self.store(parent_tile, source, cache, false) {
+                            used_slots += 1;
                             tex_sub_rect = self.subslot_to_texture_rect(slot, sub_coord);
                             tex_rect = self.slot_to_texture_rect(slot);
                             break;
@@ -140,6 +161,7 @@ impl<'a> TileCacheGl<'a> {
                 // look for cached tiles in higher zoom layers
                 for &(child_tile, child_sub_coord) in &vt.tile.children() {
                     if let Some(slot) = self.store(child_tile, source, cache, false) {
+                        used_slots += 1;
                         let tex_rect = self.slot_to_texture_rect(slot);
 
                         tvt.push(
@@ -162,7 +184,7 @@ impl<'a> TileCacheGl<'a> {
             };
         }
 
-        tvt
+        (tvt, None, used_slots)
     }
 
     fn slot_to_texture_rect(&self, slot: CacheSlot) -> TextureRect {

@@ -28,6 +28,11 @@ impl TileCache {
         }
     }
 
+    // Return the maximum number of tiles that this cache can hold at once.
+    pub fn max_tiles(&self) -> usize {
+        self.max_tiles
+    }
+
     pub fn get_sync(
         &mut self,
         tile_coord: TileCoord,

@@ -96,18 +96,29 @@ impl<'a> MapViewGl<'a> {
             center: self.map_view.center,
         });
 
-        {
-            let visible_tiles = self.map_view.visible_tiles(true);
-            let textured_visible_tiles = self.tile_cache_gl.textured_visible_tiles(
-                &visible_tiles,
-                source,
-                &mut self.tile_cache,
-            );
+        self.cx.clear_color((0.2, 0.2, 0.2, 1.0));
+
+        let visible_tiles = self.map_view.visible_tiles(true);
+        let mut remainder = visible_tiles.as_slice();
+        let mut num_draws = 0;
+        let mut max_tiles_to_use = self.tile_cache.max_tiles();
+
+        loop {
+            let (textured_visible_tiles, remainder_opt, used_tiles) = {
+                self.tile_cache_gl.textured_visible_tiles(
+                    remainder,
+                    max_tiles_to_use,
+                    source,
+                    &mut self.tile_cache,
+                )
+            };
+
+            max_tiles_to_use -= used_tiles;
 
             let mut vertex_data: Vec<f32> = Vec::with_capacity(textured_visible_tiles.len() * (6 * 8));
             let scale_x = 2.0 / f64::from(self.viewport_size.0);
             let scale_y = -2.0 / f64::from(self.viewport_size.1);
-            for tvt in textured_visible_tiles {
+            for tvt in &textured_visible_tiles {
                 let minmax = [
                     tvt.tex_minmax.x1 as f32,
                     tvt.tex_minmax.y1 as f32,
@@ -153,10 +164,32 @@ impl<'a> MapViewGl<'a> {
             }
 
             self.buf.set_data(&vertex_data, vertex_data.len() / 4);
-        }
+            self.buf.draw(DrawMode::Triangles);
 
-        self.cx.clear_color((0.9, 0.9, 0.9, 1.0));
-        self.buf.draw(DrawMode::Triangles);
+            num_draws += 1;
+            debug!("draw #{}: tvt.len() = {}, remainder = {:?}, max_tiles = {}",
+                num_draws,
+                textured_visible_tiles.len(),
+                remainder_opt.map(|r| r.len()),
+                max_tiles_to_use);
+
+            if max_tiles_to_use <= 0 {
+                warn!("tile cache is too small for this view.");
+                break;
+            }
+
+            match remainder_opt {
+                None => break,
+                Some(new_remainder) => {
+                    if new_remainder.len() >= remainder.len() {
+                        warn!("failed to draw all tiles. number of remaining tiles did not decrease.");
+                        break;
+                    } else {
+                        remainder = new_remainder;
+                    }
+                },
+            }
+        }
     }
 
     pub fn step_zoom(&mut self, steps: i32, step_size: f64) {
