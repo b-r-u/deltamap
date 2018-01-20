@@ -16,14 +16,14 @@ pub struct TexturedVisibleTile {
 }
 
 #[derive(Clone, Debug)]
-pub struct TileCacheGl<'a> {
+pub struct TileAtlas<'a> {
     texture: Texture<'a>,
     tile_size: u32,
     slots_lru: LinkedHashMap<CacheSlot, Option<Tile>>, // LRU cache of slots
     tile_to_slot: HashMap<Tile, CacheSlot>,
 }
 
-impl<'a> TileCacheGl<'a> {
+impl<'a> TileAtlas<'a> {
     pub fn new(tex: Texture<'a>, tile_size: u32) -> Self {
         let slots_x = tex.width() / tile_size;
         let slots_y = tex.height() / tile_size;
@@ -39,7 +39,7 @@ impl<'a> TileCacheGl<'a> {
 
         slots_lru.remove(&Self::default_slot());
 
-        TileCacheGl {
+        TileAtlas {
             texture: tex,
             tile_size: tile_size,
             slots_lru: slots_lru,

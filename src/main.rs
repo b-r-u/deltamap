@@ -22,7 +22,7 @@ mod program;
 mod texture;
 mod tile;
 mod tile_cache;
-mod tile_cache_gl;
+mod tile_atlas;
 mod tile_loader;
 mod tile_source;
 

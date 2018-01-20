@@ -8,7 +8,7 @@ use map_view::MapView;
 use program::Program;
 use texture::{Texture, TextureFormat};
 use tile_cache::TileCache;
-use tile_cache_gl::TileCacheGl;
+use tile_atlas::TileAtlas;
 use tile_source::TileSource;
 
 
@@ -20,7 +20,7 @@ pub struct MapViewGl<'a> {
     viewport_size: (u32, u32),
     map_view: MapView,
     tile_cache: TileCache,
-    tile_cache_gl: TileCacheGl<'a>,
+    tile_atlas: TileAtlas<'a>,
 }
 
 impl<'a> MapViewGl<'a> {
@@ -72,7 +72,7 @@ impl<'a> MapViewGl<'a> {
                 viewport_size: initial_size,
                 map_view: map_view,
                 tile_cache: TileCache::new(move |_tile| update_func(), use_network),
-                tile_cache_gl: TileCacheGl::new(tex, 256),
+                tile_atlas: TileAtlas::new(tex, 256),
             }
         }
     }
@@ -105,7 +105,7 @@ impl<'a> MapViewGl<'a> {
 
         loop {
             let (textured_visible_tiles, remainder_opt, used_tiles) = {
-                self.tile_cache_gl.textured_visible_tiles(
+                self.tile_atlas.textured_visible_tiles(
                     remainder,
                     max_tiles_to_use,
                     source,
