@@ -28,9 +28,25 @@ impl<'a> MapViewGl<'a> {
     {
         unsafe {
             let mut program = Program::from_paths(cx, "shader/map.vert", "shader/map.frag");
-
             check_gl_errors!(cx);
-            let tex = Texture::empty(cx, 2048, 2048, TextureFormat::Rgb8);
+
+            let tile_size = 256;
+
+            let atlas_size = {
+                let default_size = 2048;
+                let max_size = cx.max_texture_size() as u32;
+                if default_size <= max_size {
+                    default_size
+                } else {
+                    if tile_size * 3 > max_size {
+                        error!("maximal tile size ({}) is too small", max_size);
+                    }
+
+                    max_size
+                }
+            };
+
+            let tex = Texture::empty(cx, atlas_size, atlas_size, TextureFormat::Rgb8);
             check_gl_errors!(cx);
 
             let buf = Buffer::new(cx, &[], 0);
@@ -49,7 +65,6 @@ impl<'a> MapViewGl<'a> {
 
             program.before_render();
 
-            let tile_size = 256;
             let mut map_view = MapView::new(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
 
             // set initial zoom
