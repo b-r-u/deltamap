@@ -3,7 +3,6 @@ use ::std::ffi::CStr;
 use buffer::{Buffer, DrawMode};
 use context::Context;
 use coord::{ScreenCoord, View};
-use image;
 use map_view::MapView;
 use program::Program;
 use texture::{Texture, TextureFormat};
@@ -31,13 +30,8 @@ impl<'a> MapViewGl<'a> {
             let mut program = Program::from_paths(cx, "shader/map.vert", "shader/map.frag");
 
             check_gl_errors!(cx);
-            let mut tex = Texture::empty(cx, 2048, 2048, TextureFormat::Rgb8);
+            let tex = Texture::empty(cx, 2048, 2048, TextureFormat::Rgb8);
             check_gl_errors!(cx);
-            {
-                let img = image::open("img/no_tile.png").unwrap();
-                tex.sub_image(0, 0, &img);
-                check_gl_errors!(cx);
-            }
 
             let buf = Buffer::new(cx, &[], 0);
 
@@ -89,7 +83,14 @@ impl<'a> MapViewGl<'a> {
         }
     }
 
-    pub fn draw(&mut self, source: &TileSource) {
+    pub fn increase_atlas_size(&mut self) -> Result<(), ()> {
+        self.tile_atlas.double_texture_size()
+    }
+
+    /// Returns `Err` when tile cache is too small for this view.
+    /// Returns the number of OpenGL draw calls, which can be decreased to `1` by increasing the
+    /// size of the tile atlas.
+    pub fn draw(&mut self, source: &TileSource) -> Result<usize, usize> {
         self.tile_cache.set_view_location(View {
             source_id: source.id(),
             zoom: self.map_view.tile_zoom(),
@@ -167,6 +168,7 @@ impl<'a> MapViewGl<'a> {
             self.buf.draw(DrawMode::Triangles);
 
             num_draws += 1;
+
             debug!("draw #{}: tvt.len() = {}, remainder = {:?}, max_tiles = {}",
                 num_draws,
                 textured_visible_tiles.len(),
@@ -175,15 +177,15 @@ impl<'a> MapViewGl<'a> {
 
             if max_tiles_to_use <= 0 {
                 warn!("tile cache is too small for this view.");
-                break;
+                return Err(num_draws);
             }
 
             match remainder_opt {
-                None => break,
+                None => return Ok(num_draws),
                 Some(new_remainder) => {
                     if new_remainder.len() >= remainder.len() {
                         warn!("failed to draw all tiles. number of remaining tiles did not decrease.");
-                        break;
+                        return Err(num_draws);
                     } else {
                         remainder = new_remainder;
                     }

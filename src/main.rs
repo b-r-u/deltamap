@@ -273,6 +273,7 @@ fn main() {
     // estimated draw duration
     let mut est_draw_dur = duration_per_frame;
     let mut last_draw = Instant::now();
+    let mut increase_atlas_size = true;
 
     'outer: for event in window.wait_events() {
         debug!("{:?}", &event);
@@ -321,10 +322,24 @@ fn main() {
 
         if redraw {
             let draw_start = Instant::now();
-            map.draw(sources.current());
+            let draw_result = map.draw(sources.current());
             let draw_dur = draw_start.elapsed();
 
             let _ = window.swap_buffers();
+
+            //TODO increase atlas size earlier to avoid excessive copying to the GPU
+            //TODO increase max tile cache size?
+            increase_atlas_size = {
+                match (draw_result, increase_atlas_size) {
+                    (Err(draws), true) if draws > 1 => {
+                        map.increase_atlas_size().is_ok()
+                    },
+                    (Ok(draws), true) if draws > 1 => {
+                        map.increase_atlas_size().is_ok()
+                    },
+                    _ => increase_atlas_size,
+                }
+            };
 
             last_draw = Instant::now();
 

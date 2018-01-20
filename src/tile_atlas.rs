@@ -1,4 +1,5 @@
 use coord::{ScreenRect, SubTileCoord, TileCoord, TextureRect};
+use image;
 use linked_hash_map::LinkedHashMap;
 use map_view::VisibleTile;
 use std::collections::HashMap;
@@ -24,26 +25,60 @@ pub struct TileAtlas<'a> {
 }
 
 impl<'a> TileAtlas<'a> {
-    pub fn new(tex: Texture<'a>, tile_size: u32) -> Self {
-        let slots_x = tex.width() / tile_size;
-        let slots_y = tex.height() / tile_size;
+    fn init(&mut self) {
+        // add tile for default slot
+        {
+            let img = image::open("img/no_tile.png").unwrap();
+            self.texture.sub_image(0, 0, &img);
+        }
+
+        let slots_x = self.texture.width() / self.tile_size;
+        let slots_y = self.texture.height() / self.tile_size;
         let num_slots = (slots_x * slots_y) as usize;
 
-        let mut slots_lru = LinkedHashMap::with_capacity(num_slots);
+        self.slots_lru.clear();
+        self.slots_lru.reserve(num_slots);
         for x in 0..slots_x {
             for y in 0..slots_y {
                 let slot = CacheSlot { x: x, y: y };
-                slots_lru.insert(slot, None);
+                self.slots_lru.insert(slot, None);
             }
         }
+        self.slots_lru.remove(&Self::default_slot());
 
-        slots_lru.remove(&Self::default_slot());
+        self.tile_to_slot.clear();
+        self.tile_to_slot.reserve(num_slots);
+    }
 
-        TileAtlas {
+    pub fn new(tex: Texture<'a>, tile_size: u32) -> Self {
+        let mut atlas = TileAtlas {
             texture: tex,
             tile_size: tile_size,
-            slots_lru: slots_lru,
-            tile_to_slot: HashMap::with_capacity(num_slots),
+            slots_lru: LinkedHashMap::new(),
+            tile_to_slot: HashMap::new(),
+        };
+
+        atlas.init();
+        atlas
+    }
+
+    pub fn double_texture_size(&mut self) -> Result<(), ()> {
+        let max_size = self.texture.context().max_texture_size() as u32;
+
+        let new_width = self.texture.width() * 2;
+        let new_height = self.texture.height() * 2;
+
+        if new_width <= max_size && new_height <= max_size {
+            self.texture.resize(new_width, new_height);
+
+            // remove old entries, initialize texture
+            self.init();
+
+            info!("new atlas size {}x{}", new_width, new_height);
+
+            Ok(())
+        } else {
+            Err(())
         }
     }
 

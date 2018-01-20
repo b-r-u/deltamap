@@ -10,6 +10,7 @@ pub struct Texture<'a> {
     texture_obj: u32,
     width: u32,
     height: u32,
+    format: TextureFormat,
 }
 
 #[derive(Clone, Debug)]
@@ -64,6 +65,7 @@ impl<'a> Texture<'a> {
             texture_obj: tex_obj,
             width: width,
             height: height,
+            format: format,
         }
     }
 
@@ -90,6 +92,25 @@ impl<'a> Texture<'a> {
         }
     }
 
+    pub fn resize(&mut self, width: u32, height: u32) {
+        unsafe {
+            self.cx.gl.BindTexture(context::gl::TEXTURE_2D, self.texture_obj);
+            self.cx.gl.TexImage2D(
+                context::gl::TEXTURE_2D,
+                0, // level
+                self.format.to_gl_enum() as i32,
+                width as i32,
+                height as i32,
+                0, // border (must be zero)
+                self.format.to_gl_enum(),
+                context::gl::UNSIGNED_BYTE,
+                ::std::ptr::null() as *const _);
+
+            self.width = width;
+            self.height = height;
+        }
+    }
+
     pub fn id(&self) -> TextureId {
         TextureId {
             id: self.texture_obj,
@@ -102,6 +123,10 @@ impl<'a> Texture<'a> {
 
     pub fn height(&self) -> u32 {
         self.height
+    }
+
+    pub fn context(&self) -> &Context {
+        self.cx
     }
 }
 
