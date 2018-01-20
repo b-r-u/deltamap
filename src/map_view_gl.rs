@@ -175,7 +175,7 @@ impl<'a> MapViewGl<'a> {
                 remainder_opt.map(|r| r.len()),
                 max_tiles_to_use);
 
-            if max_tiles_to_use <= 0 {
+            if max_tiles_to_use == 0 {
                 warn!("tile cache is too small for this view.");
                 return Err(num_draws);
             }

@@ -196,7 +196,7 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
 }
 
 fn dur_to_sec(dur: Duration) -> f64 {
-    dur.as_secs() as f64 + dur.subsec_nanos() as f64 * 1e-9
+    dur.as_secs() as f64 + f64::from(dur.subsec_nanos()) * 1e-9
 }
 
 fn main() {
@@ -264,11 +264,9 @@ fn main() {
         rctrl_pressed: false,
     };
 
-    let fps: f64 = matches.value_of("fps").map(|s| s.parse().unwrap()).unwrap_or(config.fps());
+    let fps: f64 = matches.value_of("fps").map(|s| s.parse().unwrap()).unwrap_or_else(|| config.fps());
     let duration_per_frame = Duration::from_millis((1000.0 / fps - 0.5).max(0.0).floor() as u64);
-    info!("milliseconds per frame: {}",
-          duration_per_frame.as_secs() as f64 * 1000.0
-          + duration_per_frame.subsec_nanos() as f64 * 1e-6);
+    info!("milliseconds per frame: {}", dur_to_sec(duration_per_frame) * 0.001);
 
     // estimated draw duration
     let mut est_draw_dur = duration_per_frame;
