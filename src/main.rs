@@ -93,7 +93,8 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
                     // filter strange wheel events with huge values.
                     // (maybe this is just a personal touchpad driver issue)
                     if dx.abs() < 16.0 && dy.abs() < 16.0 {
-                        (dx, dy * 10.0)
+                        //TODO find a sensible line height value (servo (the glutin port) uses 38)
+                        (dx, dy * 38.0)
                     } else {
                         (0.0, 0.0)
                     }
@@ -103,16 +104,21 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
             if let Some(p) = position {
                 input_state.mouse_position = p;
             }
-            //TODO option to move or zoom on mouse wheel event
-            //map.move_pixel(-dx as f64, -dy as f64);
 
-            map.zoom_at(
-                ScreenCoord::new(
-                    f64::from(input_state.mouse_position.0),
-                    f64::from(input_state.mouse_position.1),
-                ),
-                f64::from(dy) * 0.0125,
-            );
+            //TODO add option for default mouse wheel behavior (scroll or zoom?)
+            //TODO add option to reverse scroll/zoom direction
+
+            if input_state.ctrl_pressed() {
+                map.move_pixel(f64::from(-dx), f64::from(-dy));
+            } else {
+                map.zoom_at(
+                    ScreenCoord::new(
+                        f64::from(input_state.mouse_position.0),
+                        f64::from(input_state.mouse_position.1),
+                    ),
+                    f64::from(dy) * (1.0 / 320.0),
+                );
+            }
             Action::Redraw
         },
         Event::KeyboardInput(glutin::ElementState::Pressed, _, Some(keycode)) => {
