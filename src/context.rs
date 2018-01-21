@@ -1,4 +1,6 @@
 use glutin;
+use std::mem;
+use std::ffi::CStr;
 
 pub(crate) mod gl {
     #![allow(unknown_lints)]
@@ -15,7 +17,7 @@ pub struct Context {
 impl ::std::fmt::Debug for Context {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         let version = unsafe {
-            let data = ::std::ffi::CStr::from_ptr(self.gl.GetString(gl::VERSION) as *const _).to_bytes().to_vec();
+            let data = CStr::from_ptr(self.gl.GetString(gl::VERSION) as *const _).to_bytes().to_vec();
             String::from_utf8(data).unwrap_or_else(|_| "".into())
         };
         write!(f, "Context {{ version: {:?} }}", version)
@@ -31,7 +33,17 @@ macro_rules! check_gl_errors {
 impl Context {
     pub fn from_window(window: &glutin::Window) -> Context {
         let gl = gl::Gl::load_with(|ptr| window.get_proc_address(ptr) as *const _);
-        let cx = Context {gl: gl};
+        let cx = Context { gl: gl };
+
+        // Initialize a vertex array object (VAO) if the current OpenGL context supports it. VAOs are
+        // not OpenGL ES 2.0 compatible, but are required for rendering with a core context.
+        if cx.gl.BindVertexArray.is_loaded() {
+            unsafe {
+                let mut vao = mem::uninitialized();
+                cx.gl.GenVertexArrays(1, &mut vao);
+                cx.gl.BindVertexArray(vao);
+            }
+        }
 
         info!("OpenGL version: {}", cx.gl_version());
         debug!("MAX_TEXTURE_SIZE: {}", cx.max_texture_size());
@@ -41,7 +53,7 @@ impl Context {
 
     pub fn gl_version(&self) -> String {
         unsafe {
-            let data = ::std::ffi::CStr::from_ptr(self.gl.GetString(gl::VERSION) as *const _).to_bytes().to_vec();
+            let data = CStr::from_ptr(self.gl.GetString(gl::VERSION) as *const _).to_bytes().to_vec();
             String::from_utf8(data).unwrap_or_else(|_| "".into())
         }
     }
@@ -54,29 +66,41 @@ impl Context {
         }
     }
 
-    pub unsafe fn check_errors(&self, file: &str, line: u32) {
+    pub fn check_errors(&self, file: &str, line: u32) {
+        let mut fail = false;
+
         loop {
-            match self.gl.GetError() {
+            match unsafe { self.gl.GetError() } {
                 gl::NO_ERROR => break,
                 gl::INVALID_VALUE => {
                     error!("{}:{}, invalid value error", file, line);
+                    fail = true;
                 },
                 gl::INVALID_ENUM => {
                     error!("{}:{}, invalid enum error", file, line);
+                    fail = true;
                 },
                 gl::INVALID_OPERATION => {
                     error!("{}:{}, invalid operation error", file, line);
+                    fail = true;
                 },
                 gl::INVALID_FRAMEBUFFER_OPERATION => {
                     error!("{}:{}, invalid framebuffer operation error", file, line);
+                    fail = true;
                 },
                 gl::OUT_OF_MEMORY => {
                     error!("{}:{}, out of memory error", file, line);
+                    fail = true;
                 },
                 x => {
                     error!("{}:{}, unknown error {}", file, line, x);
+                    fail = true;
                 },
             }
+        }
+
+        if fail {
+            panic!("OpenGL error");
         }
     }
 
@@ -84,6 +108,17 @@ impl Context {
         unsafe {
             self.gl.ClearColor(color.0, color.1, color.2, color.3);
             self.gl.Clear(gl::COLOR_BUFFER_BIT);
+        }
+    }
+
+    pub fn set_viewport(&self, x: i32, y: i32, width: u32, height: u32) {
+        unsafe {
+            self.gl.Viewport(
+                x,
+                y,
+                width as gl::types::GLsizei,
+                height as gl::types::GLsizei,
+            );
         }
     }
 }

@@ -38,14 +38,6 @@ impl<'a> Buffer<'a> {
                              (vertex_data.len() * mem::size_of::<f32>()) as context::gl::types::GLsizeiptr,
                              vertex_data.as_ptr() as *const _,
                              context::gl::STATIC_DRAW);
-
-            //TODO call this only once
-            // VAOs are not OpenGL ES 2.0 compatible, but are required for rendering with a core context.
-            if cx.gl.BindVertexArray.is_loaded() {
-                let mut vao = mem::uninitialized();
-                cx.gl.GenVertexArrays(1, &mut vao);
-                cx.gl.BindVertexArray(vao);
-            }
         }
 
         Buffer {

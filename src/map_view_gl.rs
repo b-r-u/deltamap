@@ -1,4 +1,3 @@
-use ::context;
 use ::std::ffi::CStr;
 use buffer::{Buffer, DrawMode};
 use context::Context;
@@ -32,76 +31,65 @@ impl<'a> MapViewGl<'a> {
         ) -> MapViewGl
         where F: Fn() + Sync + Send + 'static,
     {
-        unsafe {
-            let mut program = Program::from_paths(cx, "shader/map.vert", "shader/map.frag");
-            check_gl_errors!(cx);
+        let mut program = Program::from_paths(cx, "shader/map.vert", "shader/map.frag").unwrap();
+        check_gl_errors!(cx);
 
-            let tile_size = 256;
+        let tile_size = 256;
 
-            let atlas_size = {
-                let default_size = 2048;
-                let max_size = cx.max_texture_size() as u32;
-                if default_size <= max_size {
-                    default_size
-                } else {
-                    if tile_size * 3 > max_size {
-                        error!("maximal tile size ({}) is too small", max_size);
-                    }
-
-                    max_size
+        let atlas_size = {
+            let default_size = 2048;
+            let max_size = cx.max_texture_size() as u32;
+            if default_size <= max_size {
+                default_size
+            } else {
+                if tile_size * 3 > max_size {
+                    error!("maximal tile size ({}) is too small", max_size);
                 }
-            };
 
-            let tex = Texture::empty(cx, atlas_size, atlas_size, TextureFormat::Rgb8);
-            check_gl_errors!(cx);
-
-            let buf = Buffer::new(cx, &[], 0);
-
-            check_gl_errors!(cx);
-
-            program.add_texture(&tex, CStr::from_bytes_with_nul(b"tex_map\0").unwrap());
-            check_gl_errors!(cx);
-
-            program.add_attribute(CStr::from_bytes_with_nul(b"position\0").unwrap(), 2, 8, 0);
-            check_gl_errors!(cx);
-            program.add_attribute(CStr::from_bytes_with_nul(b"tex_coord\0").unwrap(), 2, 8, 2);
-            check_gl_errors!(cx);
-            program.add_attribute(CStr::from_bytes_with_nul(b"tex_minmax\0").unwrap(), 4, 8, 4);
-            check_gl_errors!(cx);
-
-            program.before_render();
-
-            let mut map_view = MapView::new(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
-
-            // set initial zoom
-            {
-                let min_dimension = f64::from(initial_size.0.min(initial_size.1));
-                let zoom = (min_dimension / f64::from(tile_size)).log2().ceil();
-                map_view.set_zoom(zoom);
+                max_size
             }
+        };
 
-            MapViewGl {
-                cx: cx,
-                program: program,
-                buf: buf,
-                viewport_size: initial_size,
-                map_view: map_view,
-                tile_cache: TileCache::new(move |_tile| update_func(), use_network),
-                tile_atlas: TileAtlas::new(tex, 256, use_async),
-            }
+        let tex = Texture::empty(cx, atlas_size, atlas_size, TextureFormat::Rgb8);
+        check_gl_errors!(cx);
+
+        let buf = Buffer::new(cx, &[], 0);
+        check_gl_errors!(cx);
+
+        program.add_texture(&tex, CStr::from_bytes_with_nul(b"tex_map\0").unwrap());
+        check_gl_errors!(cx);
+
+        program.add_attribute(CStr::from_bytes_with_nul(b"position\0").unwrap(), 2, 8, 0);
+        program.add_attribute(CStr::from_bytes_with_nul(b"tex_coord\0").unwrap(), 2, 8, 2);
+        program.add_attribute(CStr::from_bytes_with_nul(b"tex_minmax\0").unwrap(), 4, 8, 4);
+        check_gl_errors!(cx);
+
+        program.before_render();
+
+        let mut map_view = MapView::new(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
+
+        // set initial zoom
+        {
+            let min_dimension = f64::from(initial_size.0.min(initial_size.1));
+            let zoom = (min_dimension / f64::from(tile_size)).log2().ceil();
+            map_view.set_zoom(zoom);
+        }
+
+        MapViewGl {
+            cx: cx,
+            program: program,
+            buf: buf,
+            viewport_size: initial_size,
+            map_view: map_view,
+            tile_cache: TileCache::new(move |_tile| update_func(), use_network),
+            tile_atlas: TileAtlas::new(tex, 256, use_async),
         }
     }
 
     pub fn set_viewport_size(&mut self, width: u32, height: u32) {
         self.viewport_size = (width, height);
         self.map_view.set_size(f64::from(width), f64::from(height));
-        unsafe {
-            self.cx.gl.Viewport(
-                0,
-                0,
-                width as context::gl::types::GLsizei,
-                height as context::gl::types::GLsizei);
-        }
+        self.cx.set_viewport(0, 0, width, height);
     }
 
     pub fn increase_atlas_size(&mut self) -> Result<(), ()> {
