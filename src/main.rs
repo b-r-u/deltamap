@@ -266,7 +266,7 @@ fn main() {
 
     let fps: f64 = matches.value_of("fps").map(|s| s.parse().unwrap()).unwrap_or_else(|| config.fps());
     let duration_per_frame = Duration::from_millis((1000.0 / fps - 0.5).max(0.0).floor() as u64);
-    info!("milliseconds per frame: {}", dur_to_sec(duration_per_frame) * 0.001);
+    info!("milliseconds per frame: {}", dur_to_sec(duration_per_frame) * 1000.0);
 
     // estimated draw duration
     let mut est_draw_dur = duration_per_frame;

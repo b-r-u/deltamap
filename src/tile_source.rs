@@ -8,6 +8,7 @@ pub struct TileSource {
     url_template: String,
     directory: PathBuf,
     extension: String,
+    min_zoom: u32,
     max_zoom: u32,
 }
 
@@ -22,6 +23,7 @@ impl TileSource {
         url_template: S,
         directory: P,
         extension: String,
+        min_zoom: u32,
         max_zoom: u32,
     ) -> Self {
         TileSource {
@@ -29,6 +31,7 @@ impl TileSource {
             url_template: url_template.into(),
             directory: directory.into(),
             extension: extension,
+            min_zoom: min_zoom,
             max_zoom: max_zoom,
         }
     }
@@ -50,6 +53,10 @@ impl TileSource {
 
     pub fn remote_tile_url(&self, tile_coord: TileCoord) -> Option<String> {
         Self::fill_template(&self.url_template, tile_coord)
+    }
+
+    pub fn min_tile_zoom(&self) -> u32 {
+        self.min_zoom
     }
 
     pub fn max_tile_zoom(&self) -> u32 {

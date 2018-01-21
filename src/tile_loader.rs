@@ -214,7 +214,9 @@ impl TileLoader {
     }
 
     pub fn async_request(&mut self, tile_coord: TileCoord, source: &TileSource, write_to_file: bool) {
-        if tile_coord.zoom > source.max_tile_zoom() {
+        if tile_coord.zoom > source.max_tile_zoom() ||
+           tile_coord.zoom < source.min_tile_zoom()
+        {
             return;
         }
 
@@ -254,6 +256,12 @@ impl TileLoader {
     }
 
     pub fn get_sync(&mut self, tile: TileCoord, source: &TileSource, write_to_file: bool) -> Option<DynamicImage> {
+        if tile.zoom > source.max_tile_zoom() ||
+           tile.zoom < source.min_tile_zoom()
+        {
+            return None;
+        }
+
         match image::open(source.local_tile_path(tile)) {
             Ok(img) => {
                 Some(img)

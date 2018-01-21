@@ -85,17 +85,35 @@ impl Config {
                 let mut sources_vec: Vec<(String, TileSource)> = Vec::with_capacity(sources_table.len());
 
                 for (id, (name, source)) in sources_table.iter().enumerate() {
+                    let min_zoom = source.get("min_zoom")
+                        .unwrap_or_else(|| &Value::Integer(0))
+                        .as_integer()
+                        .ok_or_else(|| "min_zoom has to be an integer".to_string())
+                        .and_then(|m| {
+                            if m < 0 || m > 30 {
+                                Err(format!("min_zoom = {} is out of bounds, has to be in interval [0, 30]", m))
+                            } else {
+                                Ok(m)
+                            }
+                        })?;
+
                     let max_zoom = source.get("max_zoom")
                         .ok_or_else(|| format!("source {:?} is missing \"max_zoom\" entry", name))?
                         .as_integer()
                         .ok_or_else(|| "max_zoom has to be an integer".to_string())
                         .and_then(|m| {
-                            if m <= 0 || m > 30 {
-                                Err(format!("max_zoom = {} is out of bounds, has to be in interval [1, 30]", m))
+                            if m < 0 || m > 30 {
+                                Err(format!("max_zoom = {} is out of bounds, has to be in interval [0, 30]", m))
                             } else {
                                 Ok(m)
                             }
                         })?;
+
+                    if min_zoom > max_zoom {
+                        warn!("min_zoom ({}) and max_zoom ({}) allow no valid tiles", min_zoom, max_zoom);
+                    } else if min_zoom == max_zoom {
+                        warn!("min_zoom ({}) and max_zoom ({}) allow only one zoom level", min_zoom, max_zoom);
+                    }
 
                     let url_template = source.get("url_template")
                         .ok_or_else(|| format!("source {:?} is missing \"url_template\" entry", name))?
@@ -121,6 +139,7 @@ impl Config {
                             url_template.to_string(),
                             path,
                             extension.to_string(),
+                            min_zoom as u32,
                             max_zoom as u32,
                         ),
                     ));
