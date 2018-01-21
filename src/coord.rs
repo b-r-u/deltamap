@@ -155,8 +155,8 @@ impl SubTileCoord {
 }
 
 /// A tile position in a tile pyramid.
-/// Each zoom level has 2^zoom by 2^zoom tiles.
-/// `x` and `y` are allowed to be negative or >= 2^zoom but then they will not correspond to a tile
+/// Each zoom level has 2<sup>zoom</sup> by 2<sup>zoom</sup> tiles.
+/// `x` and `y` are allowed to be negative or >= 2<sup>zoom</sup> but then they will not correspond to a tile
 /// and `is_on_planet` will return false.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TileCoord {

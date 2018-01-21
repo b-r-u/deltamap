@@ -11,20 +11,20 @@ extern crate toml;
 extern crate xdg;
 
 #[macro_use]
-mod context;
+pub mod context;
 
-mod buffer;
-mod config;
-mod coord;
-mod map_view;
-mod map_view_gl;
-mod program;
-mod texture;
-mod tile;
-mod tile_cache;
-mod tile_atlas;
-mod tile_loader;
-mod tile_source;
+pub mod buffer;
+pub mod config;
+pub mod coord;
+pub mod map_view;
+pub mod map_view_gl;
+pub mod program;
+pub mod texture;
+pub mod tile;
+pub mod tile_cache;
+pub mod tile_atlas;
+pub mod tile_loader;
+pub mod tile_source;
 
 use clap::Arg;
 use coord::ScreenCoord;
