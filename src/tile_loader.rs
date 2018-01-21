@@ -168,7 +168,7 @@ impl TileLoader {
         loop {
             let message = request_rx.lock().ok().and_then(|r| r.recv().ok());
             match message {
-                None | Some(RemoteLoaderMessage::Terminate) => break,
+                None => break,
                 Some(RemoteLoaderMessage::PopQueue) => {
                     let ele: Option<TileRequest> = queue.lock().ok().and_then(|mut q| q.pop());
 
@@ -332,7 +332,6 @@ enum LoaderMessage {
 #[derive(Debug)]
 enum RemoteLoaderMessage {
     PopQueue,
-    Terminate,
 }
 
 fn compare_tiles(a: Tile, b: Tile, view: View) -> Ordering {
