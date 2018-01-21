@@ -22,6 +22,7 @@ pub struct TileAtlas<'a> {
     tile_size: u32,
     slots_lru: LinkedHashMap<CacheSlot, Option<Tile>>, // LRU cache of slots
     tile_to_slot: HashMap<Tile, CacheSlot>,
+    use_async: bool,
 }
 
 impl<'a> TileAtlas<'a> {
@@ -50,12 +51,13 @@ impl<'a> TileAtlas<'a> {
         self.tile_to_slot.reserve(num_slots);
     }
 
-    pub fn new(tex: Texture<'a>, tile_size: u32) -> Self {
+    pub fn new(tex: Texture<'a>, tile_size: u32, use_async: bool) -> Self {
         let mut atlas = TileAtlas {
             texture: tex,
             tile_size: tile_size,
             slots_lru: LinkedHashMap::new(),
             tile_to_slot: HashMap::new(),
+            use_async: use_async,
         };
 
         atlas.init();
@@ -93,7 +95,11 @@ impl<'a> TileAtlas<'a> {
         let slot = match self.tile_to_slot.entry(tile) {
             Entry::Vacant(entry) => {
                 let img_option = if load {
-                    cache.get_async(tile_coord, source, true)
+                    if self.use_async {
+                        cache.get_async(tile_coord, source, true)
+                    } else {
+                        cache.get_sync(tile_coord, source, true)
+                    }
                 } else {
                     cache.lookup(tile)
                 };

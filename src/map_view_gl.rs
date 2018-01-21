@@ -23,7 +23,13 @@ pub struct MapViewGl<'a> {
 }
 
 impl<'a> MapViewGl<'a> {
-    pub fn new<F>(cx: &Context, initial_size: (u32, u32), update_func: F, use_network: bool) -> MapViewGl
+    pub fn new<F>(
+        cx: &Context,
+        initial_size: (u32, u32),
+        update_func: F,
+        use_network: bool,
+        use_async: bool,
+        ) -> MapViewGl
         where F: Fn() + Sync + Send + 'static,
     {
         unsafe {
@@ -81,7 +87,7 @@ impl<'a> MapViewGl<'a> {
                 viewport_size: initial_size,
                 map_view: map_view,
                 tile_cache: TileCache::new(move |_tile| update_func(), use_network),
-                tile_atlas: TileAtlas::new(tex, 256),
+                tile_atlas: TileAtlas::new(tex, 256, use_async),
             }
         }
     }

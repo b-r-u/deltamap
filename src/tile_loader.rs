@@ -264,6 +264,7 @@ impl TileLoader {
 
         match image::open(source.local_tile_path(tile)) {
             Ok(img) => {
+                debug!("sync ok from path {:?}", tile);
                 Some(img)
             },
             Err(_) => {
@@ -284,13 +285,16 @@ impl TileLoader {
                                             warn!("could not write file {}, {}", &path.display(), e.description());
                                         }
                                     }
+                                    debug!("sync ok from network {:?}", tile);
                                     return Some(img);
                                 }
                             }
                         }
                     }
+                    debug!("sync fail from network {:?}", tile);
                     None
                 } else {
+                    debug!("sync fail from path {:?}", tile);
                     None
                 }
             },

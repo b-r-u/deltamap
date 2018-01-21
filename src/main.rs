@@ -221,11 +221,16 @@ fn main() {
                     .map_err(|e| e.description().to_string())
             })
             .help("Set target frames per second (default is 60). \
-                  This should equal the refresh rate of the display.")
+                This should equal the refresh rate of the display.")
             .takes_value(true))
         .arg(Arg::with_name("offline")
             .long("offline")
-            .help("Do not use the network"))
+            .help("Do not use the network. \
+                Try to load tiles from the offline file system cache."))
+        .arg(Arg::with_name("sync")
+            .long("sync")
+            .help("Load tiles in a synchronous fashion. \
+                Interaction is not possible while tiles are loading."))
         .get_matches();
 
     let config = if let Some(config_path) = matches.value_of_os("config") {
@@ -253,7 +258,8 @@ fn main() {
             &cx,
             window.get_inner_size_pixels().unwrap(),
             move || { proxy.wakeup_event_loop(); },
-            !matches.is_present("offline")
+            !matches.is_present("offline"),
+            !matches.is_present("sync"),
         )
     };
 
