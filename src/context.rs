@@ -1,6 +1,8 @@
 use glutin;
 
 pub(crate) mod gl {
+    #![allow(unknown_lints)]
+    #![allow(clippy)]
     pub use self::Gles2 as Gl;
     include!(concat!(env!("OUT_DIR"), "/gles_bindings.rs"));
 }
