@@ -31,7 +31,11 @@ impl<'a> MapViewGl<'a> {
         ) -> MapViewGl
         where F: Fn() + Sync + Send + 'static,
     {
-        let mut program = Program::from_paths(cx, "shader/map.vert", "shader/map.frag").unwrap();
+        let mut program = Program::new(
+            cx,
+            include_bytes!("../shader/map.vert"),
+            include_bytes!("../shader/map.frag"),
+        ).unwrap();
         check_gl_errors!(cx);
 
         let tile_size = 256;
