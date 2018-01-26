@@ -29,9 +29,8 @@ impl<'a> TileAtlas<'a> {
     fn init(&mut self) {
         // add tile for default slot
         {
-            let img = image::load_from_memory_with_format(
+            let img = image::load_from_memory(
                 include_bytes!("../img/no_tile.png"),
-                image::ImageFormat::PNG,
             ).unwrap();
             self.texture.sub_image(0, 0, &img);
         }
