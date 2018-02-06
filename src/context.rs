@@ -1,4 +1,5 @@
 use glutin;
+use glutin::GlContext;
 use std::mem;
 use std::ffi::CStr;
 
@@ -31,7 +32,7 @@ macro_rules! check_gl_errors {
 }
 
 impl Context {
-    pub fn from_window(window: &glutin::Window) -> Context {
+    pub fn from_gl_window(window: &glutin::GlWindow) -> Context {
         let gl = gl::Gl::load_with(|ptr| window.get_proc_address(ptr) as *const _);
         let cx = Context { gl: gl };
 

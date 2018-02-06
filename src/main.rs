@@ -28,7 +28,7 @@ pub mod tile_source;
 
 use clap::Arg;
 use coord::ScreenCoord;
-use glutin::{ElementState, Event, MouseButton, MouseScrollDelta, VirtualKeyCode};
+use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -42,160 +42,131 @@ enum Action {
     Close,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct InputState {
-    mouse_position: (i32, i32),
+    mouse_position: (f64, f64),
     mouse_pressed: bool,
-    lctrl_pressed: bool,
-    rctrl_pressed: bool,
-}
-
-impl InputState {
-    fn ctrl_pressed(&self) -> bool {
-        self.lctrl_pressed | self.rctrl_pressed
-    }
 }
 
 fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState, sources: &mut TileSources) -> Action {
     match *event {
-        Event::Closed => Action::Close,
         Event::Awakened => Action::Redraw,
-        Event::MouseInput(ElementState::Pressed, MouseButton::Left, position) => {
-            input_state.mouse_pressed = true;
-            if let Some(p) = position {
-                input_state.mouse_position = p;
-            }
-            Action::Nothing
-        },
-        Event::MouseInput(ElementState::Released, MouseButton::Left, position) => {
-            input_state.mouse_pressed = false;
-            if let Some(p) = position {
-                input_state.mouse_position = p;
-            }
-            Action::Nothing
-        },
-        Event::MouseMoved(x, y) => {
-            if input_state.mouse_pressed {
-                map.move_pixel(
-                    f64::from(input_state.mouse_position.0 - x),
-                    f64::from(input_state.mouse_position.1 - y),
-                );
-                input_state.mouse_position = (x, y);
-                Action::Redraw
-            } else {
-                input_state.mouse_position = (x, y);
+        Event::WindowEvent{ref event, ..} => match *event {
+            WindowEvent::Closed => Action::Close,
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
+                input_state.mouse_pressed = true;
                 Action::Nothing
-            }
-        },
-        Event::MouseWheel(delta, _, position) => {
-            let (dx, dy) = match delta {
-                MouseScrollDelta::LineDelta(dx, dy) => {
-                    // filter strange wheel events with huge values.
-                    // (maybe this is just a personal touchpad driver issue)
-                    if dx.abs() < 16.0 && dy.abs() < 16.0 {
-                        //TODO find a sensible line height value (servo (the glutin port) uses 38)
-                        (dx, dy * 38.0)
-                    } else {
-                        (0.0, 0.0)
-                    }
-                },
-                MouseScrollDelta::PixelDelta(dx, dy) => (dx, dy),
-            };
-            if let Some(p) = position {
-                input_state.mouse_position = p;
-            }
+            },
+            WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
+                input_state.mouse_pressed = false;
+                Action::Nothing
+            },
+            WindowEvent::CursorMoved { position: (x, y), .. } => {
+                if input_state.mouse_pressed {
+                    map.move_pixel(
+                        input_state.mouse_position.0 - x,
+                        input_state.mouse_position.1 - y,
+                    );
+                    input_state.mouse_position = (x, y);
+                    Action::Redraw
+                } else {
+                    input_state.mouse_position = (x, y);
+                    Action::Nothing
+                }
+            },
+            WindowEvent::MouseWheel { delta, modifiers, .. } => {
+                let (dx, dy) = match delta {
+                    MouseScrollDelta::LineDelta(dx, dy) => {
+                        // filter strange wheel events with huge values.
+                        // (maybe this is just a personal touchpad driver issue)
+                        if dx.abs() < 16.0 && dy.abs() < 16.0 {
+                            //TODO find a sensible line height value (servo (the glutin port) uses 38)
+                            (dx, dy * 38.0)
+                        } else {
+                            (0.0, 0.0)
+                        }
+                    },
+                    MouseScrollDelta::PixelDelta(dx, dy) => (dx, dy),
+                };
 
-            //TODO add option for default mouse wheel behavior (scroll or zoom?)
-            //TODO add option to reverse scroll/zoom direction
+                //TODO add option for default mouse wheel behavior (scroll or zoom?)
+                //TODO add option to reverse scroll/zoom direction
 
-            if input_state.ctrl_pressed() {
-                map.move_pixel(f64::from(-dx), f64::from(-dy));
-            } else {
-                map.zoom_at(
-                    ScreenCoord::new(
-                        f64::from(input_state.mouse_position.0),
-                        f64::from(input_state.mouse_position.1),
-                    ),
-                    f64::from(dy) * (1.0 / 320.0),
-                );
-            }
-            Action::Redraw
-        },
-        Event::KeyboardInput(glutin::ElementState::Pressed, _, Some(keycode)) => {
-            match keycode {
-                VirtualKeyCode::Escape => {
-                    Action::Close
-                },
-                VirtualKeyCode::LControl => {
-                    input_state.lctrl_pressed = true;
-                    Action::Nothing
-                },
-                VirtualKeyCode::RControl => {
-                    input_state.rctrl_pressed = true;
-                    Action::Nothing
-                },
-                VirtualKeyCode::PageUp => {
-                    sources.switch_to_prev();
-                    Action::Redraw
-                },
-                VirtualKeyCode::PageDown => {
-                    sources.switch_to_next();
-                    Action::Redraw
-                },
-                VirtualKeyCode::Left => {
-                    map.move_pixel(-50.0, 0.0);
-                    Action::Redraw
-                },
-                VirtualKeyCode::Right => {
-                    map.move_pixel(50.0, 0.0);
-                    Action::Redraw
-                },
-                VirtualKeyCode::Up => {
-                    map.move_pixel(0.0, -50.0);
-                    Action::Redraw
-                },
-                VirtualKeyCode::Down => {
-                    map.move_pixel(0.0, 50.0);
-                    Action::Redraw
-                },
-                VirtualKeyCode::Add => {
-                    if input_state.ctrl_pressed() {
-                        map.change_tile_zoom_offset(1.0);
-                    } else {
-                        map.step_zoom(1, 0.5);
-                    }
-                    Action::Redraw
-                },
-                VirtualKeyCode::Subtract => {
-                    if input_state.ctrl_pressed() {
-                        map.change_tile_zoom_offset(-1.0);
-                    } else {
-                        map.step_zoom(-1, 0.5);
-                    }
-                    Action::Redraw
-                },
-                _ => Action::Nothing,
-            }
-        },
-        Event::KeyboardInput(glutin::ElementState::Released, _, Some(keycode)) => {
-            match keycode {
-                VirtualKeyCode::LControl => {
-                    input_state.lctrl_pressed = false;
-                    Action::Nothing
-                },
-                VirtualKeyCode::RControl => {
-                    input_state.rctrl_pressed = false;
-                    Action::Nothing
-                },
-                _ => Action::Nothing,
-            }
-        },
-        Event::Refresh => {
-            Action::Redraw
-        },
-        Event::Resized(w, h) => {
-            map.set_viewport_size(w, h);
-            Action::Redraw
+                if modifiers.ctrl {
+                    map.move_pixel(f64::from(-dx), f64::from(-dy));
+                } else {
+                    map.zoom_at(
+                        ScreenCoord::new(
+                            input_state.mouse_position.0,
+                            input_state.mouse_position.1,
+                        ),
+                        f64::from(dy) * (1.0 / 320.0),
+                    );
+                }
+                Action::Redraw
+            },
+            WindowEvent::KeyboardInput {
+                input: glutin::KeyboardInput {
+                    state: glutin::ElementState::Pressed,
+                    virtual_keycode: Some(keycode),
+                    modifiers,
+                    .. },
+                .. } => {
+                match keycode {
+                    VirtualKeyCode::Escape => {
+                        Action::Close
+                    },
+                    VirtualKeyCode::PageUp => {
+                        sources.switch_to_prev();
+                        Action::Redraw
+                    },
+                    VirtualKeyCode::PageDown => {
+                        sources.switch_to_next();
+                        Action::Redraw
+                    },
+                    VirtualKeyCode::Left => {
+                        map.move_pixel(-50.0, 0.0);
+                        Action::Redraw
+                    },
+                    VirtualKeyCode::Right => {
+                        map.move_pixel(50.0, 0.0);
+                        Action::Redraw
+                    },
+                    VirtualKeyCode::Up => {
+                        map.move_pixel(0.0, -50.0);
+                        Action::Redraw
+                    },
+                    VirtualKeyCode::Down => {
+                        map.move_pixel(0.0, 50.0);
+                        Action::Redraw
+                    },
+                    VirtualKeyCode::Add => {
+                        if modifiers.ctrl {
+                            map.change_tile_zoom_offset(1.0);
+                        } else {
+                            map.step_zoom(1, 0.5);
+                        }
+                        Action::Redraw
+                    },
+                    VirtualKeyCode::Subtract => {
+                        if modifiers.ctrl {
+                            map.change_tile_zoom_offset(-1.0);
+                        } else {
+                            map.step_zoom(-1, 0.5);
+                        }
+                        Action::Redraw
+                    },
+                    _ => Action::Nothing,
+                }
+            },
+            WindowEvent::Refresh => {
+                Action::Redraw
+            },
+            WindowEvent::Resized(w, h) => {
+                map.set_viewport_size(w, h);
+                Action::Redraw
+            },
+            _ => Action::Nothing,
         },
         _ => Action::Nothing,
     }
@@ -247,33 +218,32 @@ fn main() {
 
     let mut sources = TileSources::new(config.tile_sources()).unwrap();
 
-    let mut window = glutin::WindowBuilder::new().build().unwrap();
-    window.set_title(&("DeltaMap - ".to_string() + sources.current_name()));
+    let mut events_loop = glutin::EventsLoop::new();
+    let builder = glutin::WindowBuilder::new()
+        .with_title(format!("DeltaMap - {}", sources.current_name()));
 
-    //TODO Find a safe way to trigger a redraw from a resize callback.
-    //TODO The callback is only allowed to access static content.
-    window.set_window_resize_callback(None);
+    let gl_context = glutin::ContextBuilder::new();
+    let gl_window = glutin::GlWindow::new(builder, gl_context, &events_loop).unwrap();
+    let window = gl_window.window();
 
-    let _ = unsafe { window.make_current() };
-    let cx = context::Context::from_window(&window);
+    let _ = unsafe { gl_window.make_current() };
+    let cx = context::Context::from_gl_window(&gl_window);
 
     let mut map = {
-        let proxy = window.create_window_proxy();
+        let proxy = events_loop.create_proxy();
 
         map_view_gl::MapViewGl::new(
             &cx,
-            window.get_inner_size_pixels().unwrap(),
-            move || { proxy.wakeup_event_loop(); },
+            window.get_inner_size().unwrap(),
+            move || { proxy.wakeup().unwrap(); },
             !matches.is_present("offline"),
             !matches.is_present("sync"),
         )
     };
 
     let mut input_state = InputState {
-        mouse_position: (0, 0),
+        mouse_position: (0.0, 0.0),
         mouse_pressed: false,
-        lctrl_pressed: false,
-        rctrl_pressed: false,
     };
 
     let fps: f64 = matches.value_of("fps").map(|s| s.parse().unwrap()).unwrap_or_else(|| config.fps());
@@ -285,29 +255,39 @@ fn main() {
     let mut last_draw = Instant::now();
     let mut increase_atlas_size = true;
 
-    'outer: for event in window.wait_events() {
-        debug!("{:?}", &event);
-
+    loop {
         let start_source_id = sources.current().id();
         let mut redraw = false;
+        let mut close = false;
 
-        match handle_event(&event, &mut map, &mut input_state, &mut sources) {
-            Action::Close => break 'outer,
-            Action::Redraw => {
-                redraw = true;
-            },
-            Action::Nothing => {},
+        events_loop.run_forever(|event| {
+            match handle_event(&event, &mut map, &mut input_state, &mut sources) {
+                Action::Close => close = true,
+                Action::Redraw => redraw = true,
+                Action::Nothing => {},
+            }
+            ControlFlow::Break
+        });
+
+        if close {
+            break;
         }
 
-        for event in window.poll_events() {
-            debug!("{:?}", &event);
+        events_loop.poll_events(|event| {
             match handle_event(&event, &mut map, &mut input_state, &mut sources) {
-                Action::Close => break 'outer,
+                Action::Close => {
+                    close = true;
+                    return;
+                },
                 Action::Redraw => {
                     redraw = true;
                 },
                 Action::Nothing => {},
             }
+        });
+
+        if close {
+            break;
         }
 
         {
@@ -316,15 +296,21 @@ fn main() {
                 if let Some(dur) = duration_per_frame.checked_sub(est_draw_dur * 2) {
                     std::thread::sleep(dur);
 
-                    for event in window.poll_events() {
-                        debug!("after sleep {:?}", &event);
+                    events_loop.poll_events(|event| {
                         match handle_event(&event, &mut map, &mut input_state, &mut sources) {
-                            Action::Close => break 'outer,
+                            Action::Close => {
+                                close = true;
+                                return;
+                            },
                             Action::Redraw => {
                                 redraw = true;
                             },
                             Action::Nothing => {},
                         }
+                    });
+
+                    if close {
+                        break;
                     }
                 }
             }
@@ -335,7 +321,7 @@ fn main() {
             let draw_result = map.draw(sources.current());
             let draw_dur = draw_start.elapsed();
 
-            let _ = window.swap_buffers();
+            let _ = gl_window.swap_buffers();
 
             //TODO increase atlas size earlier to avoid excessive copying to the GPU
             //TODO increase max tile cache size?
@@ -364,7 +350,7 @@ fn main() {
 
         // set window title
         if sources.current().id() != start_source_id {
-            window.set_title(&("DeltaMap - ".to_string() + sources.current_name()));
+            window.set_title(&format!("DeltaMap - {}", sources.current_name()));
         }
     }
 }

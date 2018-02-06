@@ -13,15 +13,15 @@ license = "GPL-3.0"
 [dependencies]
 clap = "2.29"
 env_logger = "0.5.0-rc.2"
-gl = "0.9"
+gl = "0.10"
 image = "0.18"
 linked-hash-map = "0.5.0"
 log = "0.4"
 osmpbf = "0.1"
 reqwest = "0.8"
-servo-glutin = "0.13"
+glutin = "0.12"
 toml = "0.4"
 xdg = "2.1"
 
 [build-dependencies]
-gl_generator = "0.8"
+gl_generator = "0.9"
