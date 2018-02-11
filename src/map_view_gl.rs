@@ -70,14 +70,7 @@ impl<'a> MapViewGl<'a> {
 
         program.before_render();
 
-        let mut map_view = MapView::new(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
-
-        // set initial zoom
-        {
-            let min_dimension = f64::from(initial_size.0.min(initial_size.1));
-            let zoom = (min_dimension / f64::from(tile_size)).log2().ceil();
-            map_view.set_zoom(zoom);
-        }
+        let map_view = MapView::with_filling_zoom(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
 
         MapViewGl {
             cx: cx,
@@ -209,7 +202,7 @@ impl<'a> MapViewGl<'a> {
 
     pub fn step_zoom(&mut self, steps: i32, step_size: f64) {
         let new_zoom = {
-            let z = (self.map_view.zoom2 + f64::from(steps) * step_size) / step_size;
+            let z = (self.map_view.zoom + f64::from(steps) * step_size) / step_size;
             if steps > 0 {
                 z.ceil() * step_size
             } else {
@@ -221,9 +214,9 @@ impl<'a> MapViewGl<'a> {
     }
 
     pub fn zoom(&mut self, zoom_delta: f64) {
-        if self.map_view.zoom2 + zoom_delta < 0.0 {
+        if self.map_view.zoom + zoom_delta < 0.0 {
             self.map_view.set_zoom(0.0);
-        } else if self.map_view.zoom2 + zoom_delta > 22.0 {
+        } else if self.map_view.zoom + zoom_delta > 22.0 {
             self.map_view.set_zoom(22.0);
         } else {
             self.map_view.zoom(zoom_delta);
@@ -231,9 +224,9 @@ impl<'a> MapViewGl<'a> {
     }
 
     pub fn zoom_at(&mut self, pos: ScreenCoord, zoom_delta: f64) {
-        if self.map_view.zoom2 + zoom_delta < 0.0 {
+        if self.map_view.zoom + zoom_delta < 0.0 {
             self.map_view.set_zoom_at(pos, 0.0);
-        } else if self.map_view.zoom2 + zoom_delta > 22.0 {
+        } else if self.map_view.zoom + zoom_delta > 22.0 {
             self.map_view.set_zoom_at(pos, 22.0);
         } else {
             self.map_view.zoom_at(pos, zoom_delta);
