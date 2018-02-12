@@ -5,7 +5,6 @@ use reqwest::Client;
 use std::cmp::Ordering;
 use std::cmp;
 use std::collections::hash_set::HashSet;
-use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -140,7 +139,7 @@ impl TileLoader {
                                         }
                                         if let Err(e) = remote_request_tx.send(RemoteLoaderMessage::PopQueue) {
                                             //TODO what now? restart worker?
-                                            error!("remote worker terminated, {}", e.description());
+                                            error!("remote worker terminated, {}", e);
                                         }
                                     }
                                 } else if result_tx.send((request.tile, None)).is_err() {
@@ -193,7 +192,7 @@ impl TileLoader {
 
                                     if request.write_to_file {
                                         if let Err(e) = Self::write_to_file(&request.path, &buf) {
-                                            warn!("could not write file {}, {}", request.path.display(), e.description());
+                                            warn!("could not write file {}, {}", request.path.display(), e);
                                         }
                                     }
 
@@ -282,7 +281,7 @@ impl TileLoader {
                                     if write_to_file {
                                         let path = source.local_tile_path(tile);
                                         if let Err(e) = Self::write_to_file(&path, &buf) {
-                                            warn!("could not write file {}, {}", &path.display(), e.description());
+                                            warn!("could not write file {}, {}", &path.display(), e);
                                         }
                                     }
                                     debug!("sync ok from network {:?}", tile);

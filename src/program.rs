@@ -1,6 +1,5 @@
 use ::context;
 use context::Context;
-use std::error::Error;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io::BufReader;
@@ -29,21 +28,21 @@ impl<'a> Program<'a> {
     pub fn from_paths<P: AsRef<Path>>(cx: &'a Context, vert_path: P, frag_path: P) -> Result<Program<'a>, String> {
         let vert_src = {
             let file = File::open(&vert_path)
-                .map_err(|e| e.description().to_string())?;
+                .map_err(|e| format!("{}", e))?;
             let mut reader = BufReader::new(file);
             let mut buf: Vec<u8> = vec![];
             reader.read_to_end(&mut buf)
-                .map_err(|e| e.description().to_string())?;
+                .map_err(|e| format!("{}", e))?;
             buf
         };
 
         let frag_src = {
             let file = File::open(&frag_path)
-                .map_err(|e| e.description().to_string())?;
+                .map_err(|e| format!("{}", e))?;
             let mut reader = BufReader::new(file);
             let mut buf: Vec<u8> = vec![];
             reader.read_to_end(&mut buf)
-                .map_err(|e| e.description().to_string())?;
+                .map_err(|e| format!("{}", e))?;
             buf
         };
 

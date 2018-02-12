@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -45,7 +44,7 @@ impl Config {
     /// not exist.
     fn default_tile_cache_dir() -> Result<PathBuf, String> {
         let xdg_dirs = xdg::BaseDirectories::with_prefix("deltamap")
-            .map_err(|e| e.description().to_string())?;
+            .map_err(|e| format!("{}", e))?;
 
         match xdg_dirs.find_cache_file("tiles") {
             Some(dir) => Ok(dir),
@@ -154,15 +153,15 @@ impl Config {
                 )
             },
             Ok(_) => Err("TOML file has invalid structure. Expected a Table as the top-level element.".to_string()),
-            Err(e) => Err(e.description().to_string()),
+            Err(e) => Err(format!("{}", e)),
         }
     }
 
     pub fn from_toml_file<P: AsRef<Path>>(path: P) -> Result<Config, String> {
-        let mut file = File::open(path).map_err(|e| e.description().to_string())?;
+        let mut file = File::open(path).map_err(|e| format!("{}", e))?;
 
         let mut content = String::new();
-        file.read_to_string(&mut content).map_err(|e| e.description().to_string())?;
+        file.read_to_string(&mut content).map_err(|e| format!("{}", e))?;
 
         Config::from_toml_str(&content)
     }

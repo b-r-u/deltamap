@@ -30,7 +30,6 @@ use clap::Arg;
 use coord::ScreenCoord;
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
-use std::error::Error;
 use std::time::{Duration, Instant};
 use tile_source::TileSource;
 
@@ -195,7 +194,7 @@ fn main() {
             .validator(|s| {
                 s.parse::<f64>()
                     .map(|_| ())
-                    .map_err(|e| e.description().to_string())
+                    .map_err(|e| format!("{}", e))
             })
             .help("Set target frames per second (default is 60). \
                 This should equal the refresh rate of the display.")
