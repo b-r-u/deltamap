@@ -10,9 +10,9 @@ extern crate reqwest;
 extern crate toml;
 extern crate xdg;
 
+pub mod args;
 #[macro_use]
 pub mod context;
-
 pub mod buffer;
 pub mod config;
 pub mod coord;
@@ -26,7 +26,6 @@ pub mod tile_atlas;
 pub mod tile_loader;
 pub mod tile_source;
 
-use clap::Arg;
 use coord::ScreenCoord;
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
@@ -178,36 +177,7 @@ fn dur_to_sec(dur: Duration) -> f64 {
 fn main() {
     env_logger::init();
 
-    let matches = clap::App::new("DeltaMap")
-        .version(crate_version!())
-        .author(crate_authors!())
-        .about(crate_description!())
-        .arg(Arg::with_name("config")
-            .short("c")
-            .long("config")
-            .value_name("FILE")
-            .help("Set a custom config file")
-            .takes_value(true))
-        .arg(Arg::with_name("fps")
-            .long("fps")
-            .value_name("FPS")
-            .validator(|s| {
-                s.parse::<f64>()
-                    .map(|_| ())
-                    .map_err(|e| format!("{}", e))
-            })
-            .help("Set target frames per second (default is 60). \
-                This should equal the refresh rate of the display.")
-            .takes_value(true))
-        .arg(Arg::with_name("offline")
-            .long("offline")
-            .help("Do not use the network. \
-                Try to load tiles from the offline file system cache."))
-        .arg(Arg::with_name("sync")
-            .long("sync")
-            .help("Load tiles in a synchronous fashion. \
-                Interaction is not possible while tiles are loading."))
-        .get_matches();
+    let matches = args::parse();
 
     let config = if let Some(config_path) = matches.value_of_os("config") {
             config::Config::from_toml_file(config_path).unwrap()
