@@ -103,8 +103,6 @@ impl<'a> MapViewGl<'a> {
             center: self.map_view.center,
         });
 
-        self.cx.clear_color((0.2, 0.2, 0.2, 1.0));
-
         let visible_tiles = self.map_view.visible_tiles(true);
         let mut remainder = visible_tiles.as_slice();
         let mut num_draws = 0;

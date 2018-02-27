@@ -292,6 +292,11 @@ fn main() {
 
             let _ = gl_window.swap_buffers();
 
+            // Move glClear call out of the critical path.
+            //TODO do not call glClear when drawing fills the whole screen anyway
+            cx.clear_color((0.2, 0.2, 0.2, 1.0));
+
+
             //TODO increase atlas size earlier to avoid excessive copying to the GPU
             //TODO increase max tile cache size?
             increase_atlas_size = {
