@@ -1,3 +1,4 @@
+use clap;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -13,10 +14,38 @@ pub struct Config {
     tile_cache_dir: PathBuf,
     sources: Vec<(String, TileSource)>,
     fps: f64,
+    use_network: bool,
+    async: bool,
 }
 
 impl Config {
-    pub fn load() -> Result<Config, String> {
+    pub fn from_arg_matches<'a>(matches: &clap::ArgMatches<'a>) -> Result<Config, String> {
+        let mut config = if let Some(config_path) = matches.value_of_os("config") {
+            Config::from_toml_file(config_path)?
+        } else {
+            Config::find_or_create()?
+        };
+
+        config.merge_arg_matches(matches);
+
+        Ok(config)
+    }
+
+    fn merge_arg_matches<'a>(&mut self, matches: &clap::ArgMatches<'a>) {
+        if let Some(Ok(fps)) = matches.value_of("fps").map(|s| s.parse()) {
+            self.fps = fps;
+        }
+
+        if matches.is_present("offline") {
+            self.use_network = false;
+        }
+
+        if matches.is_present("sync") {
+            self.async = false;
+        }
+    }
+
+    pub fn find_or_create() -> Result<Config, String> {
         if let Ok(xdg_dirs) = xdg::BaseDirectories::with_prefix("deltamap") {
             if let Some(config_path) = xdg_dirs.find_config_file("config.toml") {
                 info!("load config from path {:?}", config_path);
@@ -73,6 +102,22 @@ impl Config {
                         Some(&Value::Integer(fps)) => fps as f64,
                         Some(_) => return Err("fps has to be an integer or a float.".to_string()),
                         None => 60.0,
+                    }
+                };
+
+                let use_network = {
+                    match table.get("use_network") {
+                        Some(&Value::Boolean(x)) => x,
+                        Some(_) => return Err("use_network has to be a boolean.".to_string()),
+                        None => true,
+                    }
+                };
+
+                let async = {
+                    match table.get("async") {
+                        Some(&Value::Boolean(x)) => x,
+                        Some(_) => return Err("async has to be a boolean.".to_string()),
+                        None => true,
                     }
                 };
 
@@ -149,6 +194,8 @@ impl Config {
                         tile_cache_dir: tile_cache_dir,
                         sources: sources_vec,
                         fps: fps,
+                        use_network: use_network,
+                        async: async,
                     }
                 )
             },
@@ -172,6 +219,14 @@ impl Config {
 
     pub fn fps(&self) -> f64 {
         self.fps
+    }
+
+    pub fn use_network(&self) -> bool {
+        self.use_network
+    }
+
+    pub fn async(&self) -> bool {
+        self.async
     }
 }
 

@@ -177,13 +177,7 @@ fn dur_to_sec(dur: Duration) -> f64 {
 fn main() {
     env_logger::init();
 
-    let matches = args::parse();
-
-    let config = if let Some(config_path) = matches.value_of_os("config") {
-            config::Config::from_toml_file(config_path).unwrap()
-        } else {
-            config::Config::load().unwrap()
-        };
+    let config = config::Config::from_arg_matches(&args::parse()).unwrap();
 
     let mut sources = TileSources::new(config.tile_sources()).unwrap();
 
@@ -205,8 +199,8 @@ fn main() {
             &cx,
             window.get_inner_size().unwrap(),
             move || { proxy.wakeup().unwrap(); },
-            !matches.is_present("offline"),
-            !matches.is_present("sync"),
+            config.use_network(),
+            config.async(),
         )
     };
 
@@ -215,8 +209,7 @@ fn main() {
         mouse_pressed: false,
     };
 
-    let fps: f64 = matches.value_of("fps").map(|s| s.parse().unwrap()).unwrap_or_else(|| config.fps());
-    let duration_per_frame = Duration::from_millis((1000.0 / fps - 0.5).max(0.0).floor() as u64);
+    let duration_per_frame = Duration::from_millis((1000.0 / config.fps() - 0.5).max(0.0).floor() as u64);
     info!("milliseconds per frame: {}", dur_to_sec(duration_per_frame) * 1000.0);
 
     // estimated draw duration
