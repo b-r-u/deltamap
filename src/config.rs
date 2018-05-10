@@ -6,7 +6,8 @@ use tile_source::TileSource;
 use toml::Value;
 use xdg;
 
-static DEFAULT_CONFIG: &'static str = include_str!("../default_config.toml");
+static DEFAULT_CONFIG: &'static str = "";
+static DEFAULT_TILE_SOURCES: &'static str = include_str!("../default_tile_sources.toml");
 
 
 #[derive(Debug)]
@@ -19,11 +20,19 @@ pub struct Config {
 }
 
 impl Config {
+    //TODO use builder pattern to create config
+
     pub fn from_arg_matches<'a>(matches: &clap::ArgMatches<'a>) -> Result<Config, String> {
         let mut config = if let Some(config_path) = matches.value_of_os("config") {
             Config::from_toml_file(config_path)?
         } else {
             Config::find_or_create()?
+        };
+
+        if let Some(tile_sources_path) = matches.value_of_os("tile-sources") {
+            config.add_tile_sources_from_file(tile_sources_path)?;
+        } else {
+            config.add_tile_sources_from_default_or_create()?;
         };
 
         config.merge_arg_matches(matches);
@@ -45,7 +54,7 @@ impl Config {
         }
     }
 
-    pub fn find_or_create() -> Result<Config, String> {
+    fn find_or_create() -> Result<Config, String> {
         if let Ok(xdg_dirs) = xdg::BaseDirectories::with_prefix("deltamap") {
             if let Some(config_path) = xdg_dirs.find_config_file("config.toml") {
                 info!("load config from path {:?}", config_path);
@@ -69,6 +78,30 @@ impl Config {
         }
     }
 
+    fn add_tile_sources_from_default_or_create(&mut self) -> Result<(), String> {
+        if let Ok(xdg_dirs) = xdg::BaseDirectories::with_prefix("deltamap") {
+            if let Some(sources_path) = xdg_dirs.find_config_file("tile_sources.toml") {
+                info!("load tile sources from path {:?}", sources_path);
+
+                self.add_tile_sources_from_file(sources_path)
+            } else {
+                // try to write a default tile sources file
+                if let Ok(path) = xdg_dirs.place_config_file("tile_sources.toml") {
+                    if let Ok(mut file) = File::create(&path) {
+                        if file.write_all(DEFAULT_TILE_SOURCES.as_bytes()).is_ok() {
+                            info!("write default tile sources to {:?}", &path);
+                        }
+                    }
+                }
+
+                self.add_tile_sources_from_str(DEFAULT_TILE_SOURCES)
+            }
+        } else {
+            info!("load default config");
+            self.add_tile_sources_from_str(DEFAULT_TILE_SOURCES)
+        }
+    }
+
     /// Returns a tile cache directory path at a standard XDG cache location. The returned path may
     /// not exist.
     fn default_tile_cache_dir() -> Result<PathBuf, String> {
@@ -81,7 +114,7 @@ impl Config {
         }
     }
 
-    pub fn from_toml_str(toml_str: &str) -> Result<Config, String> {
+    fn from_toml_str(toml_str: &str) -> Result<Config, String> {
         match toml_str.parse::<Value>() {
             Ok(Value::Table(ref table)) => {
                 let tile_cache_dir = {
@@ -121,14 +154,44 @@ impl Config {
                     }
                 };
 
-                let sources_table = table.get("tile_sources")
+                Ok(
+                    Config {
+                        tile_cache_dir: tile_cache_dir,
+                        sources: vec![],
+                        fps: fps,
+                        use_network: use_network,
+                        async: async,
+                    }
+                )
+            },
+            Ok(_) => Err("TOML file has invalid structure. Expected a Table as the top-level element.".to_string()),
+            Err(e) => Err(format!("{}", e)),
+        }
+    }
+
+    fn from_toml_file<P: AsRef<Path>>(path: P) -> Result<Config, String> {
+        let mut file = File::open(path).map_err(|e| format!("{}", e))?;
+
+        let mut content = String::new();
+        file.read_to_string(&mut content).map_err(|e| format!("{}", e))?;
+
+        Config::from_toml_str(&content)
+    }
+
+    fn add_tile_sources_from_str(&mut self, toml_str: &str) -> Result<(), String> {
+        match toml_str.parse::<Value>() {
+            Ok(Value::Table(ref table)) => {
+                let sources_array = table.get("tile_sources")
                     .ok_or_else(|| "missing \"tile_sources\" table".to_string())?
-                    .as_table()
-                    .ok_or_else(|| "\"tile_sources\" has to be a table".to_string())?;
+                    .as_array()
+                    .ok_or_else(|| "\"tile_sources\" has to be an array.".to_string())?;
 
-                let mut sources_vec: Vec<(String, TileSource)> = Vec::with_capacity(sources_table.len());
+                for (id, source) in sources_array.iter().enumerate() {
+                    let name = source.get("name")
+                        .ok_or_else(|| "tile_source is missing \"name\" entry.".to_string())?
+                        .as_str()
+                        .ok_or_else(|| "\"name\" has to be a string".to_string())?;
 
-                for (id, (name, source)) in sources_table.iter().enumerate() {
                     let min_zoom = source.get("min_zoom")
                         .unwrap_or_else(|| &Value::Integer(0))
                         .as_integer()
@@ -169,15 +232,18 @@ impl Config {
                         .as_str()
                         .ok_or_else(|| "extension has to be a string".to_string())?;
 
+                    //TODO reduce allowed strings to a reasonable subset of valid UTF-8 strings
+                    // that can also be used as a directory name or introduce a dir_name key with
+                    // more restrictions.
                     if name.contains('/') || name.contains('\\') {
                         return Err(format!("source name ({:?}) must not contain slashes (\"/\" or \"\\\")", name));
                     }
 
-                    let mut path = PathBuf::from(&tile_cache_dir);
+                    let mut path = PathBuf::from(&self.tile_cache_dir);
                     path.push(name);
 
-                    sources_vec.push((
-                        name.clone(),
+                    self.sources.push((
+                        name.to_string(),
                         TileSource::new(
                             id as u32,
                             url_template.to_string(),
@@ -188,29 +254,20 @@ impl Config {
                         ),
                     ));
                 }
-
-                Ok(
-                    Config {
-                        tile_cache_dir: tile_cache_dir,
-                        sources: sources_vec,
-                        fps: fps,
-                        use_network: use_network,
-                        async: async,
-                    }
-                )
+                Ok(())
             },
             Ok(_) => Err("TOML file has invalid structure. Expected a Table as the top-level element.".to_string()),
             Err(e) => Err(format!("{}", e)),
         }
     }
 
-    pub fn from_toml_file<P: AsRef<Path>>(path: P) -> Result<Config, String> {
+    fn add_tile_sources_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
         let mut file = File::open(path).map_err(|e| format!("{}", e))?;
 
         let mut content = String::new();
         file.read_to_string(&mut content).map_err(|e| format!("{}", e))?;
 
-        Config::from_toml_str(&content)
+        self.add_tile_sources_from_str(&content)
     }
 
     pub fn tile_sources(&self) -> &[(String, TileSource)] {
@@ -236,6 +293,7 @@ mod tests {
 
     #[test]
     fn default_config() {
-        assert!(Config::from_toml_str(DEFAULT_CONFIG).is_ok())
+        let mut config = Config::from_toml_str(DEFAULT_CONFIG).unwrap();
+        config.add_tile_sources_from_str(DEFAULT_TILE_SOURCES).unwrap();
     }
 }
