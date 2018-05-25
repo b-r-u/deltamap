@@ -50,7 +50,7 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
     match *event {
         Event::Awakened => Action::Redraw,
         Event::WindowEvent{ref event, ..} => match *event {
-            WindowEvent::Closed => Action::Close,
+            WindowEvent::CloseRequested => Action::Close,
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
                 input_state.mouse_pressed = true;
                 Action::Nothing
