@@ -142,7 +142,7 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
                         if modifiers.ctrl {
                             map.change_tile_zoom_offset(1.0);
                         } else {
-                            map.step_zoom(1, 0.5);
+                            map.step_zoom(1, 1.0);
                         }
                         Action::Redraw
                     },
@@ -150,7 +150,7 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
                         if modifiers.ctrl {
                             map.change_tile_zoom_offset(-1.0);
                         } else {
-                            map.step_zoom(-1, 0.5);
+                            map.step_zoom(-1, 1.0);
                         }
                         Action::Redraw
                     },
