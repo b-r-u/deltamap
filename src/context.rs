@@ -34,7 +34,7 @@ macro_rules! check_gl_errors {
 impl Context {
     pub fn from_gl_window(window: &glutin::GlWindow) -> Context {
         let gl = gl::Gl::load_with(|ptr| window.get_proc_address(ptr) as *const _);
-        let cx = Context { gl: gl };
+        let cx = Context { gl };
 
         // Initialize a vertex array object (VAO) if the current OpenGL context supports it. VAOs are
         // not OpenGL ES 2.0 compatible, but are required for rendering with a core context.

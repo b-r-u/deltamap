@@ -156,11 +156,11 @@ impl Config {
 
                 Ok(
                     Config {
-                        tile_cache_dir: tile_cache_dir,
+                        tile_cache_dir,
                         sources: vec![],
-                        fps: fps,
-                        use_network: use_network,
-                        async: async,
+                        fps,
+                        use_network,
+                        async,
                     }
                 )
             },

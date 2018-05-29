@@ -37,10 +37,10 @@ impl TileLoader {
         TileLoader {
             client: None,
             join_handle: thread::spawn(move || Self::work(&request_rx, &result_tx, notice_func, use_network)),
-            request_tx: request_tx,
-            result_rx: result_rx,
+            request_tx,
+            result_rx,
             pending: HashSet::new(),
-            use_network: use_network,
+            use_network,
         }
     }
 
@@ -225,10 +225,10 @@ impl TileLoader {
             if let Some(url) = source.remote_tile_url(tile_coord) {
                 if self.request_tx.send(LoaderMessage::GetTile(
                         TileRequest {
-                            tile: tile,
-                            url: url,
+                            tile,
+                            url,
                             path: source.local_tile_path(tile_coord),
-                            write_to_file: write_to_file,
+                            write_to_file,
                         }
                     )).is_ok()
                 {

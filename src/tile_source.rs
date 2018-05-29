@@ -27,12 +27,12 @@ impl TileSource {
         max_zoom: u32,
     ) -> Self {
         TileSource {
-            id: id,
+            id,
             url_template: url_template.into(),
             directory: directory.into(),
-            extension: extension,
-            min_zoom: min_zoom,
-            max_zoom: max_zoom,
+            extension,
+            min_zoom,
+            max_zoom,
         }
     }
 

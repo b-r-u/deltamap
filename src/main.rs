@@ -334,7 +334,7 @@ impl<'a> TileSources<'a> {
         } else {
             Some(TileSources {
                 current_index: 0,
-                sources: sources,
+                sources,
             })
         }
     }

@@ -31,11 +31,11 @@ impl MapView {
     /// Constructs a new `MapView`.
     pub fn new(width: f64, height: f64, tile_size: u32, center: MapCoord, zoom: f64) -> MapView {
         MapView {
-            width: width,
-            height: height,
-            tile_size: tile_size,
-            center: center,
-            zoom: zoom,
+            width,
+            height,
+            tile_size,
+            center,
+            zoom,
             tile_zoom_offset: 0.0,
         }
     }
@@ -46,11 +46,11 @@ impl MapView {
         let min_dimension = width.min(height);
         let zoom = (min_dimension / f64::from(tile_size)).log2().ceil();
         MapView {
-            width: width,
-            height: height,
-            tile_size: tile_size,
+            width,
+            height,
+            tile_size,
             center: MapCoord::new(0.5, 0.5),
-            zoom: zoom,
+            zoom,
             tile_zoom_offset: 0.0,
         }
     }

@@ -38,10 +38,10 @@ impl<'a> Texture<'a> {
     }
 
     fn from_ptr(cx: &'a Context, width: u32, height: u32, format: TextureFormat, data_ptr: *const c_void) -> Texture<'a> {
-        let mut tex_obj = 0_u32;
+        let mut texture_obj = 0_u32;
         unsafe {
-            cx.gl.GenTextures(1, &mut tex_obj);
-            cx.gl.BindTexture(context::gl::TEXTURE_2D, tex_obj);
+            cx.gl.GenTextures(1, &mut texture_obj);
+            cx.gl.BindTexture(context::gl::TEXTURE_2D, texture_obj);
 
             cx.gl.TexParameteri(context::gl::TEXTURE_2D, context::gl::TEXTURE_MIN_FILTER, context::gl::LINEAR as i32);
             cx.gl.TexParameteri(context::gl::TEXTURE_2D, context::gl::TEXTURE_MAG_FILTER, context::gl::LINEAR as i32);
@@ -61,11 +61,11 @@ impl<'a> Texture<'a> {
         }
 
         Texture {
-            cx: cx,
-            texture_obj: tex_obj,
-            width: width,
-            height: height,
-            format: format,
+            cx,
+            texture_obj,
+            width,
+            height,
+            format,
         }
     }
 

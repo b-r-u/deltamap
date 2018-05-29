@@ -92,10 +92,10 @@ impl<'a> Program<'a> {
             };
 
             Ok(Program {
-                cx: cx,
-                vert_obj: vert_obj,
-                frag_obj: frag_obj,
-                program_obj: program_obj,
+                cx,
+                vert_obj,
+                frag_obj,
+                program_obj,
                 tex_ids: vec![],
                 tex_locations: vec![],
             })

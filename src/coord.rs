@@ -11,10 +11,7 @@ pub struct MapCoord {
 
 impl MapCoord {
     pub fn new(x: f64, y: f64) -> MapCoord {
-        MapCoord {
-            x: x,
-            y: y,
-        }
+        MapCoord { x, y }
     }
 
     pub fn from_latlon(latitude: f64, longitude: f64) -> MapCoord {
@@ -22,26 +19,16 @@ impl MapCoord {
         let pi_lat = latitude * (PI / 180.0);
         let y = f64::ln(f64::tan(pi_lat) + 1.0 / f64::cos(pi_lat)) * (-0.5 / PI) + 0.5;
 
-        MapCoord {
-            x: x,
-            y: y,
-        }
+        MapCoord { x, y }
     }
 
     //TODO differ between normalized and not normalized tiles
     pub fn on_tile_at_zoom(&self, zoom: u32) -> TileCoord {
         let zoom_factor = f64::powi(2.0, zoom as i32);
-        let ix = (self.x * zoom_factor).floor() as i32;
-        let iy = (self.y * zoom_factor).floor() as i32;
+        let x = (self.x * zoom_factor).floor() as i32;
+        let y = (self.y * zoom_factor).floor() as i32;
 
-        let x = ix;
-        let y = iy;
-
-        TileCoord {
-            zoom: zoom,
-            x: x,
-            y: y,
-        }
+        TileCoord { zoom, x, y }
     }
 
     pub fn normalize_x(&mut self) {
@@ -68,11 +55,9 @@ pub struct ScreenCoord {
 
 impl ScreenCoord {
     pub fn new(x: f64, y: f64) -> Self {
-        ScreenCoord {
-            x: x,
-            y: y,
-        }
+        ScreenCoord { x, y }
     }
+
     pub fn snap_to_pixel(&mut self) {
         self.x = self.x.floor();
         self.y = self.y.floor();
@@ -168,9 +153,9 @@ pub struct TileCoord {
 impl TileCoord {
     pub fn new(zoom: u32, x: i32, y: i32) -> TileCoord {
         TileCoord {
-            zoom: zoom,
+            zoom,
             x: Self::normalize_coord(x, zoom),
-            y: y,
+            y,
         }
     }
 

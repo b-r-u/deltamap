@@ -73,11 +73,11 @@ impl<'a> MapViewGl<'a> {
         let map_view = MapView::with_filling_zoom(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
 
         MapViewGl {
-            cx: cx,
-            program: program,
-            buf: buf,
+            cx,
+            program,
+            buf,
             viewport_size: initial_size,
-            map_view: map_view,
+            map_view,
             tile_cache: TileCache::new(move |_tile| update_func(), use_network),
             tile_atlas: TileAtlas::new(tex, 256, use_async),
         }

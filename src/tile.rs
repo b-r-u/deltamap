@@ -11,8 +11,8 @@ pub struct Tile {
 impl Tile {
     pub fn new(coord: TileCoord, source_id: TileSourceId) -> Tile {
         Tile {
-            coord: coord,
-            source_id: source_id,
+            coord,
+            source_id,
         }
     }
 }

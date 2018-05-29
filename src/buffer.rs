@@ -41,9 +41,9 @@ impl<'a> Buffer<'a> {
         }
 
         Buffer {
-            cx: cx,
-            buffer_obj: buffer_obj,
-            num_elements: num_elements,
+            cx,
+            buffer_obj,
+            num_elements,
         }
     }
 

@@ -3,7 +3,7 @@ use clap::Arg;
 
 
 pub fn parse<'a>() -> clap::ArgMatches<'a> {
-    let matches = clap::App::new("DeltaMap")
+    clap::App::new("DeltaMap")
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
@@ -38,7 +38,5 @@ pub fn parse<'a>() -> clap::ArgMatches<'a> {
             .long("sync")
             .help("Load tiles in a synchronous fashion. \
                 The UI is blocked while tiles are loading."))
-        .get_matches();
-
-    matches
+        .get_matches()
 }

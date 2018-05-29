@@ -43,7 +43,7 @@ impl<'a> TileAtlas<'a> {
         self.slots_lru.reserve(num_slots);
         for x in 0..slots_x {
             for y in 0..slots_y {
-                let slot = CacheSlot { x: x, y: y };
+                let slot = CacheSlot { x, y };
                 self.slots_lru.insert(slot, None);
             }
         }
@@ -56,10 +56,10 @@ impl<'a> TileAtlas<'a> {
     pub fn new(tex: Texture<'a>, tile_size: u32, use_async: bool) -> Self {
         let mut atlas = TileAtlas {
             texture: tex,
-            tile_size: tile_size,
+            tile_size,
             slots_lru: LinkedHashMap::new(),
             tile_to_slot: HashMap::new(),
-            use_async: use_async,
+            use_async,
         };
 
         atlas.init();
@@ -172,7 +172,7 @@ impl<'a> TileAtlas<'a> {
                 tvt.push(
                     TexturedVisibleTile {
                         screen_rect: vt.rect,
-                        tex_rect: tex_rect,
+                        tex_rect,
                         tex_minmax: tex_rect.inset(inset_x, inset_y),
                     }
                 );
@@ -210,7 +210,7 @@ impl<'a> TileAtlas<'a> {
                         tvt.push(
                             TexturedVisibleTile {
                                 screen_rect: vt.rect.subdivide(&child_sub_coord),
-                                tex_rect: tex_rect,
+                                tex_rect,
                                 tex_minmax: tex_rect.inset(inset_x, inset_y),
                             }
                         );
