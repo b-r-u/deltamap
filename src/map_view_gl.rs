@@ -10,6 +10,9 @@ use tile_atlas::TileAtlas;
 use tile_source::TileSource;
 
 
+const MIN_ZOOM_LEVEL: f64 = 0.0;
+const MAX_ZOOM_LEVEL: f64 = 22.0;
+
 #[derive(Debug)]
 pub struct MapViewGl<'a> {
     cx: &'a Context,
@@ -70,7 +73,11 @@ impl<'a> MapViewGl<'a> {
 
         program.before_render();
 
-        let map_view = MapView::with_filling_zoom(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
+        let mut map_view = MapView::with_filling_zoom(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
+
+        if map_view.zoom < MIN_ZOOM_LEVEL {
+            map_view.zoom = MIN_ZOOM_LEVEL;
+        }
 
         MapViewGl {
             cx,
@@ -206,26 +213,26 @@ impl<'a> MapViewGl<'a> {
             } else {
                 z.floor() * step_size
             }
-        }.max(0.0).min(22.0);
+        }.max(MIN_ZOOM_LEVEL).min(MAX_ZOOM_LEVEL);
 
         self.map_view.set_zoom(new_zoom);
     }
 
     pub fn zoom(&mut self, zoom_delta: f64) {
-        if self.map_view.zoom + zoom_delta < 0.0 {
-            self.map_view.set_zoom(0.0);
-        } else if self.map_view.zoom + zoom_delta > 22.0 {
-            self.map_view.set_zoom(22.0);
+        if self.map_view.zoom + zoom_delta < MIN_ZOOM_LEVEL {
+            self.map_view.set_zoom(MIN_ZOOM_LEVEL);
+        } else if self.map_view.zoom + zoom_delta > MAX_ZOOM_LEVEL {
+            self.map_view.set_zoom(MAX_ZOOM_LEVEL);
         } else {
             self.map_view.zoom(zoom_delta);
         }
     }
 
     pub fn zoom_at(&mut self, pos: ScreenCoord, zoom_delta: f64) {
-        if self.map_view.zoom + zoom_delta < 0.0 {
-            self.map_view.set_zoom_at(pos, 0.0);
-        } else if self.map_view.zoom + zoom_delta > 22.0 {
-            self.map_view.set_zoom_at(pos, 22.0);
+        if self.map_view.zoom + zoom_delta < MIN_ZOOM_LEVEL {
+            self.map_view.set_zoom_at(pos, MIN_ZOOM_LEVEL);
+        } else if self.map_view.zoom + zoom_delta > MAX_ZOOM_LEVEL {
+            self.map_view.set_zoom_at(pos, MAX_ZOOM_LEVEL);
         } else {
             self.map_view.zoom_at(pos, zoom_delta);
         }
