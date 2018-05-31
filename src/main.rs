@@ -29,6 +29,7 @@ pub mod tile_source;
 use coord::ScreenCoord;
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
+use std::error::Error;
 use std::time::{Duration, Instant};
 use tile_source::TileSource;
 
@@ -174,19 +175,18 @@ fn dur_to_sec(dur: Duration) -> f64 {
     dur.as_secs() as f64 + f64::from(dur.subsec_nanos()) * 1e-9
 }
 
-fn main() {
-    env_logger::init();
+fn run() -> Result<(), Box<Error>> {
+    let config = config::Config::from_arg_matches(&args::parse())?;
 
-    let config = config::Config::from_arg_matches(&args::parse()).unwrap();
-
-    let mut sources = TileSources::new(config.tile_sources()).unwrap();
+    let mut sources = TileSources::new(config.tile_sources())
+        .ok_or_else(|| "no tile sources provided.")?;
 
     let mut events_loop = glutin::EventsLoop::new();
     let builder = glutin::WindowBuilder::new()
         .with_title(format!("DeltaMap - {}", sources.current_name()));
 
     let gl_context = glutin::ContextBuilder::new();
-    let gl_window = glutin::GlWindow::new(builder, gl_context, &events_loop).unwrap();
+    let gl_window = glutin::GlWindow::new(builder, gl_context, &events_loop)?;
     let window = gl_window.window();
 
     let _ = unsafe { gl_window.make_current() };
@@ -319,6 +319,17 @@ fn main() {
         if sources.current().id() != start_source_id {
             window.set_title(&format!("DeltaMap - {}", sources.current_name()));
         }
+    }
+
+    Ok(())
+}
+
+fn main() {
+    env_logger::init();
+
+    if let Err(err) = run() {
+        println!("{}", err);
+        std::process::exit(1);
     }
 }
 
