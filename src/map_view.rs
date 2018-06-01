@@ -78,6 +78,16 @@ impl MapView {
         }
     }
 
+    /// Returns true if the viewport rectangle is fully inside the map.
+    pub fn viewport_in_map(&self) -> bool {
+        let scale = f64::powf(2.0, -self.zoom) / f64::from(self.tile_size);
+
+        let y_top = self.center.y + -0.5 * self.height * scale;
+        let y_bottom = self.center.y + 0.5 * self.height * scale;
+
+        y_top >= 0.0 && y_bottom <= 1.0
+    }
+
     /// Returns the screen coordinate of the top-left corner of a tile.
     pub fn tile_screen_position(&self, tile: &TileCoord) -> ScreenCoord {
         self.map_to_screen_coord(tile.map_coord_north_west())

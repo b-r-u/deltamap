@@ -96,6 +96,10 @@ impl<'a> MapViewGl<'a> {
         self.cx.set_viewport(0, 0, width, height);
     }
 
+    pub fn viewport_in_map(&self) -> bool {
+        self.map_view.viewport_in_map()
+    }
+
     pub fn increase_atlas_size(&mut self) -> Result<(), ()> {
         self.tile_atlas.double_texture_size()
     }
