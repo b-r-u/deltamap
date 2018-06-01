@@ -3,9 +3,12 @@ extern crate clap;
 extern crate env_logger;
 extern crate glutin;
 extern crate image;
+#[macro_use]
+extern crate lazy_static;
 extern crate linked_hash_map;
 #[macro_use]
 extern crate log;
+extern crate regex;
 extern crate reqwest;
 extern crate toml;
 extern crate xdg;
@@ -21,10 +24,11 @@ pub mod map_view_gl;
 pub mod program;
 pub mod texture;
 pub mod tile;
-pub mod tile_cache;
 pub mod tile_atlas;
+pub mod tile_cache;
 pub mod tile_loader;
 pub mod tile_source;
+pub mod url_template;
 
 use coord::ScreenCoord;
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};

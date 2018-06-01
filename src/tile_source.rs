@@ -1,11 +1,12 @@
 use coord::TileCoord;
 use std::path::PathBuf;
+use url_template::UrlTemplate;
 
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct TileSource {
     id: u32,
-    url_template: String,
+    url_template: UrlTemplate,
     directory: PathBuf,
     extension: String,
     min_zoom: u32,
@@ -25,15 +26,15 @@ impl TileSource {
         extension: String,
         min_zoom: u32,
         max_zoom: u32,
-    ) -> Self {
-        TileSource {
+    ) -> Result<Self, String> {
+        Ok(TileSource {
             id,
-            url_template: url_template.into(),
+            url_template: UrlTemplate::new(url_template)?,
             directory: directory.into(),
             extension,
             min_zoom,
             max_zoom,
-        }
+        })
     }
 
     pub fn id(&self) -> TileSourceId {
@@ -52,7 +53,7 @@ impl TileSource {
     }
 
     pub fn remote_tile_url(&self, tile_coord: TileCoord) -> Option<String> {
-        Self::fill_template(&self.url_template, tile_coord)
+        self.url_template.fill(tile_coord)
     }
 
     pub fn min_tile_zoom(&self) -> u32 {
@@ -61,21 +62,5 @@ impl TileSource {
 
     pub fn max_tile_zoom(&self) -> u32 {
         self.max_zoom
-    }
-
-    fn fill_template(template: &str, tile_coord: TileCoord) -> Option<String> {
-        let x_str = tile_coord.x.to_string();
-        let y_str = tile_coord.y.to_string();
-        let z_str = tile_coord.zoom.to_string();
-
-        //TODO use the regex crate for templates or some other more elegant method
-        if template.contains("{quadkey}") {
-            tile_coord.to_quadkey().map(|qk| template.replacen("{quadkey}", &qk, 1))
-        } else {
-            Some(template.replacen("{x}", &x_str, 1)
-                    .replacen("{y}", &y_str, 1)
-                    .replacen("{z}", &z_str, 1)
-                )
-        }
     }
 }

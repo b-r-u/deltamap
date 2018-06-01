@@ -251,7 +251,7 @@ impl Config {
                             extension.to_string(),
                             min_zoom as u32,
                             max_zoom as u32,
-                        ),
+                        )?,
                     ));
                 }
                 Ok(())
