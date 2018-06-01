@@ -91,7 +91,12 @@ impl MapView {
         let tile_screen_size = f64::powf(2.0, self.zoom - f64::from(uzoom)) * f64::from(self.tile_size);
 
         if snap_to_pixel {
-            top_left_tile_screen_coord.snap_to_pixel();
+            // only snap to pixel if apparent zoom is integer
+            let apparent_zoom = self.zoom + self.tile_zoom_offset;
+            let apparent_zoom_int = (apparent_zoom + 0.5).floor();
+            if (apparent_zoom - apparent_zoom_int).abs() < 1e-10 {
+                top_left_tile_screen_coord.snap_to_pixel();
+            }
         }
 
         let start_tile_x = top_left_tile.x;
