@@ -16,7 +16,7 @@ enum Placeholder {
 }
 
 impl Placeholder {
-    /// Returns maximum number of bytes that the value for a placeholder with occupy.
+    /// Returns maximum number of bytes that the value for a placeholder will occupy.
     fn max_size(&self) -> usize {
         match *self {
             Placeholder::X | Placeholder::Y | Placeholder::Z => 11,
@@ -25,11 +25,12 @@ impl Placeholder {
     }
 }
 
+/// A template for tile URLs that can be efficiently filled with values from a `TileCoord`.
 #[derive(Debug)]
 pub struct UrlTemplate {
     /// The template string that includes placeholders between static parts
     template_string: String,
-    /// Ranges into `template_string` for static parts
+    /// Ranges into `template_string` for the static parts
     static_parts: Vec<::std::ops::Range<usize>>,
     /// Kinds of placeholders between the static parts
     placeholders: Vec<Placeholder>,
