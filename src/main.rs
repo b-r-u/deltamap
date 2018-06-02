@@ -42,7 +42,20 @@ use tile_source::TileSource;
 enum Action {
     Nothing,
     Redraw,
+    Resize(u32, u32),
     Close,
+}
+
+impl Action {
+    fn combine_with(&mut self, newer_action: Self) {
+        *self = match (*self, newer_action) {
+            (Action::Close, _) | (_, Action::Close) => Action::Close,
+            (Action::Resize(..), Action::Resize(w, h)) => Action::Resize(w, h),
+            (Action::Resize(w, h), _) | (_, Action::Resize(w, h)) => Action::Resize(w, h),
+            (Action::Redraw, _) | (_, Action::Redraw) => Action::Redraw,
+            (Action::Nothing, Action::Nothing) => Action::Nothing,
+        };
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -166,8 +179,7 @@ fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState
                 Action::Redraw
             },
             WindowEvent::Resized(w, h) => {
-                map.set_viewport_size(w, h);
-                Action::Redraw
+                Action::Resize(w, h)
             },
             _ => Action::Nothing,
         },
@@ -219,40 +231,31 @@ fn run() -> Result<(), Box<Error>> {
     // estimated draw duration
     let mut est_draw_dur = duration_per_frame;
     let mut last_draw = Instant::now();
-    let mut increase_atlas_size = true;
+    let mut increase_atlas_size_possible = true;
 
     loop {
         let start_source_id = sources.current().id();
-        let mut redraw = false;
-        let mut close = false;
+        let mut action = Action::Nothing;
 
         events_loop.run_forever(|event| {
-            match handle_event(&event, &mut map, &mut input_state, &mut sources) {
-                Action::Close => close = true,
-                Action::Redraw => redraw = true,
-                Action::Nothing => {},
-            }
+            let a = handle_event(&event, &mut map, &mut input_state, &mut sources);
+            action.combine_with(a);
             ControlFlow::Break
         });
 
-        if close {
+        if action == Action::Close {
             break;
         }
 
         events_loop.poll_events(|event| {
-            match handle_event(&event, &mut map, &mut input_state, &mut sources) {
-                Action::Close => {
-                    close = true;
-                    return;
-                },
-                Action::Redraw => {
-                    redraw = true;
-                },
-                Action::Nothing => {},
+            let a = handle_event(&event, &mut map, &mut input_state, &mut sources);
+            action.combine_with(a);
+            if action == Action::Close {
+                return;
             }
         });
 
-        if close {
+        if action == Action::Close {
             break;
         }
 
@@ -263,50 +266,55 @@ fn run() -> Result<(), Box<Error>> {
                     std::thread::sleep(dur);
 
                     events_loop.poll_events(|event| {
-                        match handle_event(&event, &mut map, &mut input_state, &mut sources) {
-                            Action::Close => {
-                                close = true;
-                                return;
-                            },
-                            Action::Redraw => {
-                                redraw = true;
-                            },
-                            Action::Nothing => {},
+                        let a = handle_event(&event, &mut map, &mut input_state, &mut sources);
+                        action.combine_with(a);
+                        if action == Action::Close {
+                            return;
                         }
                     });
 
-                    if close {
+                    if action == Action::Close {
                         break;
                     }
                 }
             }
         }
 
+        if let Action::Resize(w, h) = action {
+            gl_window.resize(w, h);
+            map.set_viewport_size(w, h);
+        }
+
+        let redraw = match action {
+            Action::Redraw => true,
+            Action::Resize(..) => true,
+            _ => false,
+        };
+
         if redraw {
             let draw_start = Instant::now();
-            let draw_result = map.draw(sources.current());
-            let draw_dur = draw_start.elapsed();
 
-            let _ = gl_window.swap_buffers();
-
-            // Move glClear call out of the critical path.
             if !map.viewport_in_map() {
                 cx.clear_color((0.2, 0.2, 0.2, 1.0));
             }
+            let draw_result = map.draw(sources.current());
+
+            let draw_dur = draw_start.elapsed();
+
+
+            let _ = gl_window.swap_buffers();
 
             //TODO increase atlas size earlier to avoid excessive copying to the GPU
             //TODO increase max tile cache size?
-            increase_atlas_size = {
-                match (draw_result, increase_atlas_size) {
-                    (Err(draws), true) if draws > 1 => {
-                        map.increase_atlas_size().is_ok()
-                    },
-                    (Ok(draws), true) if draws > 1 => {
-                        map.increase_atlas_size().is_ok()
-                    },
-                    _ => increase_atlas_size,
+            if increase_atlas_size_possible {
+                let draws = match draw_result {
+                    Ok(x) => x,
+                    Err(x) => x,
+                };
+                if draws > 1 {
+                    increase_atlas_size_possible = map.increase_atlas_size().is_ok();
                 }
-            };
+            }
 
             last_draw = Instant::now();
 
