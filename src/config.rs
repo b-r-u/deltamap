@@ -1,13 +1,18 @@
 use clap;
+use directories::ProjectDirs;
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use tile_source::TileSource;
 use toml::Value;
-use xdg;
 
 static DEFAULT_CONFIG: &'static str = "";
 static DEFAULT_TILE_SOURCES: &'static str = include_str!("../default_tile_sources.toml");
+
+lazy_static! {
+    static ref PROJ_DIRS: ProjectDirs = ProjectDirs::from("", "", "DeltaMap");
+}
 
 
 #[derive(Debug)]
@@ -54,64 +59,87 @@ impl Config {
         }
     }
 
-    fn find_or_create() -> Result<Config, String> {
-        if let Ok(xdg_dirs) = xdg::BaseDirectories::with_prefix("deltamap") {
-            if let Some(config_path) = xdg_dirs.find_config_file("config.toml") {
-                info!("load config from path {:?}", config_path);
-
-                Config::from_toml_file(config_path)
-            } else {
-                // try to write a default config file
-                if let Ok(path) = xdg_dirs.place_config_file("config.toml") {
-                    if let Ok(mut file) = File::create(&path) {
-                        if file.write_all(DEFAULT_CONFIG.as_bytes()).is_ok() {
-                            info!("write default config to {:?}", &path);
-                        }
-                    }
-                }
-
-                Config::from_toml_str(DEFAULT_CONFIG)
+    fn create_config_file<P: AsRef<Path> + Debug>(dir_path: P, file_path: P, contents: &[u8]) -> Result<(), String> {
+        if !dir_path.as_ref().is_dir() {
+            if let Err(err) = ::std::fs::create_dir_all(&dir_path) {
+                return Err(format!("failed to create config directory ({:?}): {}",
+                    dir_path,
+                    err
+                ));
             }
+        }
+
+        let mut file = File::create(&file_path)
+            .map_err(|err| format!("failed to create config file {:?}: {}", &file_path, err))?;
+
+        file.write_all(contents)
+            .map_err(|err| format!(
+                "failed to write contents to config file {:?}: {}",
+                &file_path,
+                err
+            ))
+    }
+
+    fn find_or_create() -> Result<Config, String> {
+        let config_dir = PROJ_DIRS.config_dir();
+        let config_file = {
+            let mut path = PathBuf::from(config_dir);
+            path.push("config.toml");
+            path
+        };
+
+        if config_file.is_file() {
+            info!("load config from path {:?}", config_file);
+
+            Config::from_toml_file(config_file)
         } else {
-            info!("load default config");
+            // try to write a default config file
+
+            if let Err(err) = Config::create_config_file(
+                config_dir,
+                &config_file,
+                DEFAULT_CONFIG.as_bytes())
+            {
+                warn!("{}", err);
+            }
+
             Config::from_toml_str(DEFAULT_CONFIG)
         }
     }
 
     fn add_tile_sources_from_default_or_create(&mut self) -> Result<(), String> {
-        if let Ok(xdg_dirs) = xdg::BaseDirectories::with_prefix("deltamap") {
-            if let Some(sources_path) = xdg_dirs.find_config_file("tile_sources.toml") {
-                info!("load tile sources from path {:?}", sources_path);
+        let config_dir = PROJ_DIRS.config_dir();
+        let sources_file = {
+            let mut path = PathBuf::from(config_dir);
+            path.push("tile_sources.toml");
+            path
+        };
 
-                self.add_tile_sources_from_file(sources_path)
-            } else {
-                // try to write a default tile sources file
-                if let Ok(path) = xdg_dirs.place_config_file("tile_sources.toml") {
-                    if let Ok(mut file) = File::create(&path) {
-                        if file.write_all(DEFAULT_TILE_SOURCES.as_bytes()).is_ok() {
-                            info!("write default tile sources to {:?}", &path);
-                        }
-                    }
-                }
+        if sources_file.is_file() {
+            info!("load tile sources from path {:?}", sources_file);
 
-                self.add_tile_sources_from_str(DEFAULT_TILE_SOURCES)
-            }
+            self.add_tile_sources_from_file(sources_file)
         } else {
-            info!("load default config");
+            // try to write a default config file
+
+            if let Err(err) = Config::create_config_file(
+                config_dir,
+                &sources_file,
+                DEFAULT_TILE_SOURCES.as_bytes())
+            {
+                warn!("{}", err);
+            }
+
             self.add_tile_sources_from_str(DEFAULT_TILE_SOURCES)
         }
     }
 
-    /// Returns a tile cache directory path at a standard XDG cache location. The returned path may
-    /// not exist.
-    fn default_tile_cache_dir() -> Result<PathBuf, String> {
-        let xdg_dirs = xdg::BaseDirectories::with_prefix("deltamap")
-            .map_err(|e| format!("{}", e))?;
-
-        match xdg_dirs.find_cache_file("tiles") {
-            Some(dir) => Ok(dir),
-            None => Ok(xdg_dirs.get_cache_home().join("tiles")),
-        }
+    /// Returns a tile cache directory path at a standard location. The returned path may not
+    /// exist.
+    fn default_tile_cache_dir() -> PathBuf {
+        let mut path = PathBuf::from(PROJ_DIRS.cache_dir());
+        path.push("tiles");
+        path
     }
 
     fn from_toml_str(toml_str: &str) -> Result<Config, String> {
@@ -125,7 +153,7 @@ impl Config {
                                    .ok_or_else(|| "tile_cache_dir has to be a string".to_string())?
                             )
                         },
-                        None => Config::default_tile_cache_dir()?,
+                        None => Config::default_tile_cache_dir(),
                     }
                 };
 

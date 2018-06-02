@@ -23,7 +23,7 @@ osmpbf = "0.1"
 regex = "1.0"
 reqwest = "0.8"
 toml = "0.4"
-xdg = "2.1"
+directories = "0.10"
 
 [build-dependencies]
 gl_generator = "0.9"

@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate clap;
+extern crate directories;
 extern crate env_logger;
 extern crate glutin;
 extern crate image;
@@ -11,7 +12,6 @@ extern crate log;
 extern crate regex;
 extern crate reqwest;
 extern crate toml;
-extern crate xdg;
 
 pub mod args;
 #[macro_use]
