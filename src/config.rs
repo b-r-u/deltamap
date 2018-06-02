@@ -95,12 +95,13 @@ impl Config {
         } else {
             // try to write a default config file
 
-            if let Err(err) = Config::create_config_file(
+            match Config::create_config_file(
                 config_dir,
                 &config_file,
-                DEFAULT_CONFIG.as_bytes())
-            {
-                warn!("{}", err);
+                DEFAULT_CONFIG.as_bytes()
+            ) {
+                Err(err) => warn!("{}", err),
+                Ok(()) => info!("create default config file {:?}", config_file),
             }
 
             Config::from_toml_str(DEFAULT_CONFIG)
@@ -122,12 +123,13 @@ impl Config {
         } else {
             // try to write a default config file
 
-            if let Err(err) = Config::create_config_file(
+            match Config::create_config_file(
                 config_dir,
                 &sources_file,
-                DEFAULT_TILE_SOURCES.as_bytes())
-            {
-                warn!("{}", err);
+                DEFAULT_TILE_SOURCES.as_bytes()
+            ) {
+                Err(err) => warn!("{}", err),
+                Ok(()) => info!("create default tile sources file {:?}", sources_file),
             }
 
             self.add_tile_sources_from_str(DEFAULT_TILE_SOURCES)
