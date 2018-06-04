@@ -13,12 +13,23 @@ use texture::Texture;
 pub struct Program {
     vert_obj: u32,
     frag_obj: u32,
-    program_obj: u32,
+    program_id: ProgramId,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct ProgramId {
     id: u32,
+}
+
+impl ProgramId {
+    /// Returns an invalid `ProgramId`.
+    pub fn invalid() -> Self {
+        ProgramId{ id: 0 }
+    }
+
+    pub fn index(&self) -> u32 {
+        self.id
+    }
 }
 
 impl Program {
@@ -76,30 +87,32 @@ impl Program {
                 frag_obj
             };
 
-            let program_obj = {
+            let program_id = {
                 let prog = cx.gl.CreateProgram();
                 cx.gl.AttachShader(prog, vert_obj);
                 cx.gl.AttachShader(prog, frag_obj);
                 cx.gl.LinkProgram(prog);
                 check_link_errors(cx, prog)?;
 
-                cx.gl.UseProgram(prog);
-                check_gl_errors!(cx);
-                prog
+                ProgramId { id: prog }
             };
+
+            cx.use_program(program_id);
+            check_gl_errors!(cx);
 
             Ok(Program {
                 vert_obj,
                 frag_obj,
-                program_obj,
+                program_id,
             })
         }
     }
 
     pub fn add_texture(&mut self, cx: &mut Context, texture: &Texture, uniform_name: &CStr) {
         //TODO store reference to texture
+        cx.use_program(self.program_id);
         unsafe {
-            let tex_loc = cx.gl.GetUniformLocation(self.program_obj, uniform_name.as_ptr() as *const _);
+            let tex_loc = cx.gl.GetUniformLocation(self.program_id.index(), uniform_name.as_ptr() as *const _);
             check_gl_errors!(cx);
 
             cx.gl.Uniform1i(tex_loc, texture.unit().index() as i32);
@@ -107,8 +120,9 @@ impl Program {
     }
 
     pub fn add_attribute(&mut self, cx: &mut Context, name: &CStr, number_components: u32, stride: usize, offset: usize) {
+        cx.use_program(self.program_id);
         unsafe {
-            let attrib_id = cx.gl.GetAttribLocation(self.program_obj, name.as_ptr() as *const _);
+            let attrib_id = cx.gl.GetAttribLocation(self.program_id.index(), name.as_ptr() as *const _);
             cx.gl.VertexAttribPointer(
                 attrib_id as u32,
                 number_components as i32, // size
@@ -122,9 +136,7 @@ impl Program {
     }
 
     pub fn id(&self) -> ProgramId {
-        ProgramId {
-            id: self.program_obj,
-        }
+        self.program_id
     }
 }
 

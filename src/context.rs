@@ -1,7 +1,8 @@
-use glutin;
 use glutin::GlContext;
-use std::mem;
+use glutin;
+use program::ProgramId;
 use std::ffi::CStr;
+use std::mem;
 
 pub(crate) mod gl {
     #![allow(unknown_lints)]
@@ -24,6 +25,7 @@ pub struct Context {
     pub(crate) gl: gl::Gl,
     active_texture_unit: TextureUnit,
     next_free_texture_unit: TextureUnit,
+    active_program: ProgramId,
 }
 
 impl ::std::fmt::Debug for Context {
@@ -50,6 +52,7 @@ impl Context {
             /// Initial active texture unit is supposed to be GL_TEXTURE0
             active_texture_unit: TextureUnit(0),
             next_free_texture_unit: TextureUnit(0),
+            active_program: ProgramId::invalid(),
         };
 
         // Initialize a vertex array object (VAO) if the current OpenGL context supports it. VAOs are
@@ -144,8 +147,8 @@ impl Context {
             unsafe {
                 self.gl.ActiveTexture(gl::TEXTURE0 + unit.0);
             }
+            self.active_texture_unit = unit;
         }
-        self.active_texture_unit = unit;
     }
 
     pub fn occupy_free_texture_unit(&mut self) -> TextureUnit {
@@ -156,5 +159,14 @@ impl Context {
         self.next_free_texture_unit = TextureUnit(self.next_free_texture_unit.0 + 1);
 
         tu
+    }
+
+    pub fn use_program(&mut self, prog: ProgramId) {
+        if prog != self.active_program {
+            unsafe {
+                self.gl.UseProgram(prog.index());
+            }
+            self.active_program = prog;
+        }
     }
 }
