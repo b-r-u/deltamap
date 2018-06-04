@@ -100,11 +100,9 @@ impl MapView {
         let mut top_left_tile_screen_coord = self.tile_screen_position(&top_left_tile);
         let tile_screen_size = f64::powf(2.0, self.zoom - f64::from(uzoom)) * f64::from(self.tile_size);
 
-        if snap_to_pixel {
-            // only snap to pixel if zoom has integral value
-            if (self.zoom - (self.zoom + 0.5).floor()).abs() < 1e-10 {
-                top_left_tile_screen_coord.snap_to_pixel();
-            }
+        // only snap to pixel grid if zoom has integral value
+        if snap_to_pixel && (self.zoom - (self.zoom + 0.5).floor()).abs() < 1e-10 {
+            top_left_tile_screen_coord.snap_to_pixel();
         }
 
         let start_tile_x = top_left_tile.x;
