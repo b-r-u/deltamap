@@ -1,3 +1,4 @@
+use buffer::BufferId;
 use glutin::GlContext;
 use glutin;
 use program::ProgramId;
@@ -26,6 +27,7 @@ pub struct Context {
     active_texture_unit: TextureUnit,
     next_free_texture_unit: TextureUnit,
     active_program: ProgramId,
+    active_buffer: BufferId,
 }
 
 impl ::std::fmt::Debug for Context {
@@ -53,6 +55,7 @@ impl Context {
             active_texture_unit: TextureUnit(0),
             next_free_texture_unit: TextureUnit(0),
             active_program: ProgramId::invalid(),
+            active_buffer: BufferId::invalid(),
         };
 
         // Initialize a vertex array object (VAO) if the current OpenGL context supports it. VAOs are
@@ -167,6 +170,15 @@ impl Context {
                 self.gl.UseProgram(prog.index());
             }
             self.active_program = prog;
+        }
+    }
+
+    pub fn bind_buffer(&mut self, buf: BufferId) {
+        if buf != self.active_buffer {
+            unsafe {
+                self.gl.BindBuffer(gl::ARRAY_BUFFER, buf.index());
+            }
+            self.active_buffer = buf;
         }
     }
 }
