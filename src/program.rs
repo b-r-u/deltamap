@@ -10,8 +10,7 @@ use texture::{Texture, TextureId};
 
 
 #[derive(Clone, Debug)]
-pub struct Program<'a> {
-    cx: &'a ::context::Context,
+pub struct Program {
     vert_obj: u32,
     frag_obj: u32,
     program_obj: u32,
@@ -24,8 +23,8 @@ pub struct ProgramId {
     id: u32,
 }
 
-impl<'a> Program<'a> {
-    pub fn from_paths<P: AsRef<Path>>(cx: &'a Context, vert_path: P, frag_path: P) -> Result<Program<'a>, String> {
+impl Program {
+    pub fn from_paths<P: AsRef<Path>>(cx: &mut Context, vert_path: P, frag_path: P) -> Result<Program, String> {
         let vert_src = {
             let file = File::open(&vert_path)
                 .map_err(|e| format!("{}", e))?;
@@ -49,7 +48,7 @@ impl<'a> Program<'a> {
         Self::new(cx, &vert_src, &frag_src)
     }
 
-    pub fn new(cx: &'a Context, vert_src: &[u8], frag_src: &[u8]) -> Result<Program<'a>, String> {
+    pub fn new(cx: &mut Context, vert_src: &[u8], frag_src: &[u8]) -> Result<Program, String> {
         unsafe {
             let vert_obj = {
                 let vert_obj = cx.gl.CreateShader(context::gl::VERTEX_SHADER);
@@ -92,7 +91,6 @@ impl<'a> Program<'a> {
             };
 
             Ok(Program {
-                cx,
                 vert_obj,
                 frag_obj,
                 program_obj,
@@ -102,40 +100,40 @@ impl<'a> Program<'a> {
         }
     }
 
-    pub fn add_texture(&mut self, texture: &Texture, uniform_name: &CStr) {
+    pub fn add_texture(&mut self, cx: &mut Context, texture: &Texture, uniform_name: &CStr) {
         //TODO store reference to texture
         unsafe {
-            let tex_loc = self.cx.gl.GetUniformLocation(self.program_obj, uniform_name.as_ptr() as *const _);
-            check_gl_errors!(self.cx);
+            let tex_loc = cx.gl.GetUniformLocation(self.program_obj, uniform_name.as_ptr() as *const _);
+            check_gl_errors!(cx);
 
             self.tex_ids.push(texture.id());
             self.tex_locations.push(tex_loc);
         }
     }
 
-    pub fn add_attribute(&mut self, name: &CStr, number_components: u32, stride: usize, offset: usize) {
+    pub fn add_attribute(&mut self, cx: &mut Context, name: &CStr, number_components: u32, stride: usize, offset: usize) {
         unsafe {
-            let attrib_id = self.cx.gl.GetAttribLocation(self.program_obj, name.as_ptr() as *const _);
-            self.cx.gl.VertexAttribPointer(
+            let attrib_id = cx.gl.GetAttribLocation(self.program_obj, name.as_ptr() as *const _);
+            cx.gl.VertexAttribPointer(
                 attrib_id as u32,
                 number_components as i32, // size
                 context::gl::FLOAT, // type
                 0, // normalized
                 (stride * mem::size_of::<f32>()) as context::gl::types::GLsizei,
                 (offset * mem::size_of::<f32>()) as *const () as *const _);
-            self.cx.gl.EnableVertexAttribArray(attrib_id as u32);
+            cx.gl.EnableVertexAttribArray(attrib_id as u32);
         }
-        check_gl_errors!(self.cx);
+        check_gl_errors!(cx);
     }
 
-    pub fn before_render(&self) {
+    pub fn before_render(&self, cx: &mut Context) {
         unsafe {
-            //self.cx.gl.UseProgram(self.program_obj);
+            //cx.gl.UseProgram(self.program_obj);
             //TODO check max texture number
             for (i, (tex_id, &tex_loc)) in self.tex_ids.iter().zip(&self.tex_locations).enumerate() {
-                self.cx.gl.ActiveTexture(context::gl::TEXTURE0 + i as u32);
-                self.cx.gl.BindTexture(context::gl::TEXTURE_2D, tex_id.id);
-                self.cx.gl.Uniform1i(tex_loc, i as i32);
+                cx.gl.ActiveTexture(context::gl::TEXTURE0 + i as u32);
+                cx.gl.BindTexture(context::gl::TEXTURE_2D, tex_id.id);
+                cx.gl.Uniform1i(tex_loc, i as i32);
             }
         }
     }

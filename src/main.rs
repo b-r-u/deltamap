@@ -206,13 +206,13 @@ fn run() -> Result<(), Box<Error>> {
     let window = gl_window.window();
 
     let _ = unsafe { gl_window.make_current() };
-    let cx = context::Context::from_gl_window(&gl_window);
+    let mut cx = context::Context::from_gl_window(&gl_window);
 
     let mut map = {
         let proxy = events_loop.create_proxy();
 
         map_view_gl::MapViewGl::new(
-            &cx,
+            &mut cx,
             window.get_inner_size().unwrap(),
             move || { proxy.wakeup().unwrap(); },
             config.use_network(),
@@ -282,7 +282,7 @@ fn run() -> Result<(), Box<Error>> {
 
         if let Action::Resize(w, h) = action {
             gl_window.resize(w, h);
-            map.set_viewport_size(w, h);
+            map.set_viewport_size(&mut cx, w, h);
         }
 
         let redraw = match action {
@@ -297,12 +297,14 @@ fn run() -> Result<(), Box<Error>> {
             if !map.viewport_in_map() {
                 cx.clear_color((0.2, 0.2, 0.2, 1.0));
             }
-            let draw_result = map.draw(sources.current());
+            let draw_result = map.draw(&mut cx, sources.current());
 
             let draw_dur = draw_start.elapsed();
 
 
             let _ = gl_window.swap_buffers();
+
+            last_draw = Instant::now();
 
             //TODO increase atlas size earlier to avoid excessive copying to the GPU
             //TODO increase max tile cache size?
@@ -312,11 +314,9 @@ fn run() -> Result<(), Box<Error>> {
                     Err(x) => x,
                 };
                 if draws > 1 {
-                    increase_atlas_size_possible = map.increase_atlas_size().is_ok();
+                    increase_atlas_size_possible = map.increase_atlas_size(&mut cx).is_ok();
                 }
             }
-
-            last_draw = Instant::now();
 
             debug!("draw: {} sec (est {} sec)", dur_to_sec(draw_dur), dur_to_sec(est_draw_dur));
 

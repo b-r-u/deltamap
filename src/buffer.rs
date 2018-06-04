@@ -4,8 +4,7 @@ use std::mem;
 
 
 #[derive(Clone, Debug)]
-pub struct Buffer<'a> {
-    cx: &'a Context,
+pub struct Buffer {
     buffer_obj: u32,
     num_elements: usize,
 }
@@ -27,8 +26,8 @@ impl DrawMode {
     }
 }
 
-impl<'a> Buffer<'a> {
-    pub fn new(cx: &'a Context, vertex_data: &[f32], num_elements: usize) -> Buffer<'a> {
+impl Buffer {
+    pub fn new(cx: &mut Context, vertex_data: &[f32], num_elements: usize) -> Buffer {
         let mut buffer_obj = 0_u32;
 
         unsafe {
@@ -41,15 +40,14 @@ impl<'a> Buffer<'a> {
         }
 
         Buffer {
-            cx,
             buffer_obj,
             num_elements,
         }
     }
 
-    pub fn set_data(&mut self, vertex_data: &[f32], num_elements: usize) {
+    pub fn set_data(&mut self, cx: &mut Context, vertex_data: &[f32], num_elements: usize) {
         unsafe {
-            self.cx.gl.BufferData(context::gl::ARRAY_BUFFER,
+            cx.gl.BufferData(context::gl::ARRAY_BUFFER,
                                   (vertex_data.len() * mem::size_of::<f32>()) as context::gl::types::GLsizeiptr,
                                   vertex_data.as_ptr() as *const _,
                                   context::gl::DYNAMIC_DRAW);
@@ -57,15 +55,15 @@ impl<'a> Buffer<'a> {
         self.num_elements = num_elements;
     }
 
-    pub fn bind(&self) {
+    pub fn bind(&self, cx: &mut Context) {
         unsafe {
-            self.cx.gl.BindBuffer(context::gl::ARRAY_BUFFER, self.buffer_obj);
+            cx.gl.BindBuffer(context::gl::ARRAY_BUFFER, self.buffer_obj);
         }
     }
 
-    pub fn draw(&self, mode: DrawMode) {
+    pub fn draw(&self, cx: &mut Context, mode: DrawMode) {
         unsafe {
-            self.cx.gl.DrawArrays(
+            cx.gl.DrawArrays(
                 mode.to_gl_enum(),
                 0,
                 self.num_elements as context::gl::types::GLsizei);

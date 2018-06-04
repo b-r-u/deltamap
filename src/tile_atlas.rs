@@ -1,3 +1,4 @@
+use context::Context;
 use coord::{ScreenRect, SubTileCoord, TileCoord, TextureRect};
 use image;
 use linked_hash_map::LinkedHashMap;
@@ -17,22 +18,22 @@ pub struct TexturedVisibleTile {
 }
 
 #[derive(Clone, Debug)]
-pub struct TileAtlas<'a> {
-    texture: Texture<'a>,
+pub struct TileAtlas {
+    texture: Texture,
     tile_size: u32,
     slots_lru: LinkedHashMap<CacheSlot, Option<Tile>>, // LRU cache of slots
     tile_to_slot: HashMap<Tile, CacheSlot>,
     use_async: bool,
 }
 
-impl<'a> TileAtlas<'a> {
-    fn init(&mut self) {
+impl TileAtlas {
+    fn init(&mut self, cx: &mut Context) {
         // add tile for default slot
         {
             let img = image::load_from_memory(
                 include_bytes!("../img/no_tile.png"),
             ).unwrap();
-            self.texture.sub_image(0, 0, &img);
+            self.texture.sub_image(cx, 0, 0, &img);
         }
 
         let slots_x = self.texture.width() / self.tile_size;
@@ -53,7 +54,7 @@ impl<'a> TileAtlas<'a> {
         self.tile_to_slot.reserve(num_slots);
     }
 
-    pub fn new(tex: Texture<'a>, tile_size: u32, use_async: bool) -> Self {
+    pub fn new(cx: &mut Context, tex: Texture, tile_size: u32, use_async: bool) -> Self {
         let mut atlas = TileAtlas {
             texture: tex,
             tile_size,
@@ -62,21 +63,21 @@ impl<'a> TileAtlas<'a> {
             use_async,
         };
 
-        atlas.init();
+        atlas.init(cx);
         atlas
     }
 
-    pub fn double_texture_size(&mut self) -> Result<(), ()> {
-        let max_size = self.texture.context().max_texture_size() as u32;
+    pub fn double_texture_size(&mut self, cx: &mut Context) -> Result<(), ()> {
+        let max_size = cx.max_texture_size() as u32;
 
         let new_width = self.texture.width() * 2;
         let new_height = self.texture.height() * 2;
 
         if new_width <= max_size && new_height <= max_size {
-            self.texture.resize(new_width, new_height);
+            self.texture.resize(cx, new_width, new_height);
 
             // remove old entries, initialize texture
-            self.init();
+            self.init(cx);
 
             info!("new atlas size {}x{}", new_width, new_height);
 
@@ -90,7 +91,7 @@ impl<'a> TileAtlas<'a> {
         CacheSlot { x: 0, y: 0 }
     }
 
-    pub fn store(&mut self, tile_coord: TileCoord, source: &TileSource, cache: &mut TileCache, load: bool) -> Option<CacheSlot> {
+    pub fn store(&mut self, cx: &mut Context, tile_coord: TileCoord, source: &TileSource, cache: &mut TileCache, load: bool) -> Option<CacheSlot> {
         let mut remove_tile = None;
         let tile = Tile::new(tile_coord, source.id());
 
@@ -113,6 +114,7 @@ impl<'a> TileAtlas<'a> {
                     remove_tile = old_tile;
 
                     self.texture.sub_image(
+                        cx,
                         (slot.x * self.tile_size) as i32,
                         (slot.y * self.tile_size) as i32,
                         img,
@@ -145,6 +147,7 @@ impl<'a> TileAtlas<'a> {
     /// the number of used tiles is returned as an `usize`.
     pub fn textured_visible_tiles<'b>(
         &mut self,
+        cx: &mut Context,
         visible_tiles: &'b [VisibleTile],
         max_tiles_to_use: usize,
         source: &TileSource,
@@ -166,7 +169,7 @@ impl<'a> TileAtlas<'a> {
                 return (tvt, Some(&visible_tiles[i..]), used_slots);
             }
 
-            if let Some(slot) = self.store(vt.tile, source, cache, true) {
+            if let Some(slot) = self.store(cx, vt.tile, source, cache, true) {
                 let tex_rect = self.slot_to_texture_rect(slot);
                 used_slots += 1;
                 tvt.push(
@@ -190,7 +193,7 @@ impl<'a> TileAtlas<'a> {
                 // look for cached tiles in lower zoom layers
                 for dist in 1..31 {
                     if let Some((parent_tile, sub_coord)) = vt.tile.parent(dist) {
-                        if let Some(slot) = self.store(parent_tile, source, cache, false) {
+                        if let Some(slot) = self.store(cx, parent_tile, source, cache, false) {
                             used_slots += 1;
                             tex_sub_rect = self.subslot_to_texture_rect(slot, sub_coord);
                             tex_rect = self.slot_to_texture_rect(slot);
@@ -203,7 +206,7 @@ impl<'a> TileAtlas<'a> {
 
                 // look for cached tiles in higher zoom layers
                 for &(child_tile, child_sub_coord) in &vt.tile.children() {
-                    if let Some(slot) = self.store(child_tile, source, cache, false) {
+                    if let Some(slot) = self.store(cx, child_tile, source, cache, false) {
                         used_slots += 1;
                         let tex_rect = self.slot_to_texture_rect(slot);
 

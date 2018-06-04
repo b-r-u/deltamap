@@ -5,8 +5,7 @@ use image::GenericImage;
 use std::os::raw::c_void;
 
 #[derive(Clone, Debug)]
-pub struct Texture<'a> {
-    cx: &'a Context,
+pub struct Texture {
     texture_obj: u32,
     width: u32,
     height: u32,
@@ -18,8 +17,8 @@ pub struct TextureId {
     pub(crate) id: u32,
 }
 
-impl<'a> Texture<'a> {
-    pub fn new(cx: &'a Context, img: &image::DynamicImage) -> Result<Texture<'a>, ()> {
+impl Texture {
+    pub fn new(cx: &mut Context, img: &image::DynamicImage) -> Result<Texture, ()> {
         let format = match *img {
             image::ImageRgb8(_) => TextureFormat::Rgb8,
             image::ImageRgba8(_) => TextureFormat::Rgba8,
@@ -29,15 +28,15 @@ impl<'a> Texture<'a> {
         Ok(Self::from_bytes(cx, img.width(), img.height(), format, &img.raw_pixels()))
     }
 
-    pub fn empty(cx: &'a Context, width: u32, height: u32, format: TextureFormat) -> Texture<'a> {
+    pub fn empty(cx: &mut Context, width: u32, height: u32, format: TextureFormat) -> Texture {
         Self::from_ptr(cx, width, height, format, ::std::ptr::null() as *const _)
     }
 
-    pub fn from_bytes(cx: &'a Context, width: u32, height: u32, format: TextureFormat, data: &[u8]) -> Texture<'a> {
+    pub fn from_bytes(cx: &mut Context, width: u32, height: u32, format: TextureFormat, data: &[u8]) -> Texture {
         Self::from_ptr(cx, width, height, format, data.as_ptr() as *const _)
     }
 
-    fn from_ptr(cx: &'a Context, width: u32, height: u32, format: TextureFormat, data_ptr: *const c_void) -> Texture<'a> {
+    fn from_ptr(cx: &mut Context, width: u32, height: u32, format: TextureFormat, data_ptr: *const c_void) -> Texture {
         let mut texture_obj = 0_u32;
         unsafe {
             cx.gl.GenTextures(1, &mut texture_obj);
@@ -61,7 +60,6 @@ impl<'a> Texture<'a> {
         }
 
         Texture {
-            cx,
             texture_obj,
             width,
             height,
@@ -69,7 +67,7 @@ impl<'a> Texture<'a> {
         }
     }
 
-    pub fn sub_image(&mut self, x: i32, y: i32, img: &image::DynamicImage) {
+    pub fn sub_image(&mut self, cx: &mut Context, x: i32, y: i32, img: &image::DynamicImage) {
         let format = match *img {
             image::ImageRgb8(_) => TextureFormat::Rgb8,
             image::ImageRgba8(_) => TextureFormat::Rgba8,
@@ -77,8 +75,8 @@ impl<'a> Texture<'a> {
         };
 
         unsafe {
-            self.cx.gl.BindTexture(context::gl::TEXTURE_2D, self.texture_obj);
-            self.cx.gl.TexSubImage2D(
+            cx.gl.BindTexture(context::gl::TEXTURE_2D, self.texture_obj);
+            cx.gl.TexSubImage2D(
                 context::gl::TEXTURE_2D,
                 0, // level
                 x, // x offset
@@ -92,10 +90,10 @@ impl<'a> Texture<'a> {
         }
     }
 
-    pub fn resize(&mut self, width: u32, height: u32) {
+    pub fn resize(&mut self, cx: &mut Context, width: u32, height: u32) {
         unsafe {
-            self.cx.gl.BindTexture(context::gl::TEXTURE_2D, self.texture_obj);
-            self.cx.gl.TexImage2D(
+            cx.gl.BindTexture(context::gl::TEXTURE_2D, self.texture_obj);
+            cx.gl.TexImage2D(
                 context::gl::TEXTURE_2D,
                 0, // level
                 self.format.to_gl_enum() as i32,
@@ -123,10 +121,6 @@ impl<'a> Texture<'a> {
 
     pub fn height(&self) -> u32 {
         self.height
-    }
-
-    pub fn context(&self) -> &Context {
-        self.cx
     }
 }
 

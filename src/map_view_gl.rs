@@ -14,19 +14,18 @@ const MIN_ZOOM_LEVEL: f64 = 0.0;
 const MAX_ZOOM_LEVEL: f64 = 22.0;
 
 #[derive(Debug)]
-pub struct MapViewGl<'a> {
-    cx: &'a Context,
-    program: Program<'a>,
-    buf: Buffer<'a>,
+pub struct MapViewGl {
+    program: Program,
+    buf: Buffer,
     viewport_size: (u32, u32),
     map_view: MapView,
     tile_cache: TileCache,
-    tile_atlas: TileAtlas<'a>,
+    tile_atlas: TileAtlas,
 }
 
-impl<'a> MapViewGl<'a> {
+impl MapViewGl {
     pub fn new<F>(
-        cx: &Context,
+        cx: &mut Context,
         initial_size: (u32, u32),
         update_func: F,
         use_network: bool,
@@ -63,15 +62,15 @@ impl<'a> MapViewGl<'a> {
         let buf = Buffer::new(cx, &[], 0);
         check_gl_errors!(cx);
 
-        program.add_texture(&tex, CStr::from_bytes_with_nul(b"tex_map\0").unwrap());
+        program.add_texture(cx, &tex, CStr::from_bytes_with_nul(b"tex_map\0").unwrap());
         check_gl_errors!(cx);
 
-        program.add_attribute(CStr::from_bytes_with_nul(b"position\0").unwrap(), 2, 8, 0);
-        program.add_attribute(CStr::from_bytes_with_nul(b"tex_coord\0").unwrap(), 2, 8, 2);
-        program.add_attribute(CStr::from_bytes_with_nul(b"tex_minmax\0").unwrap(), 4, 8, 4);
+        program.add_attribute(cx, CStr::from_bytes_with_nul(b"position\0").unwrap(), 2, 8, 0);
+        program.add_attribute(cx, CStr::from_bytes_with_nul(b"tex_coord\0").unwrap(), 2, 8, 2);
+        program.add_attribute(cx, CStr::from_bytes_with_nul(b"tex_minmax\0").unwrap(), 4, 8, 4);
         check_gl_errors!(cx);
 
-        program.before_render();
+        program.before_render(cx);
 
         let mut map_view = MapView::with_filling_zoom(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
 
@@ -80,34 +79,33 @@ impl<'a> MapViewGl<'a> {
         }
 
         MapViewGl {
-            cx,
             program,
             buf,
             viewport_size: initial_size,
             map_view,
             tile_cache: TileCache::new(move |_tile| update_func(), use_network),
-            tile_atlas: TileAtlas::new(tex, 256, use_async),
+            tile_atlas: TileAtlas::new(cx, tex, 256, use_async),
         }
     }
 
-    pub fn set_viewport_size(&mut self, width: u32, height: u32) {
+    pub fn set_viewport_size(&mut self, cx: &mut Context, width: u32, height: u32) {
         self.viewport_size = (width, height);
         self.map_view.set_size(f64::from(width), f64::from(height));
-        self.cx.set_viewport(0, 0, width, height);
+        cx.set_viewport(0, 0, width, height);
     }
 
     pub fn viewport_in_map(&self) -> bool {
         self.map_view.viewport_in_map()
     }
 
-    pub fn increase_atlas_size(&mut self) -> Result<(), ()> {
-        self.tile_atlas.double_texture_size()
+    pub fn increase_atlas_size(&mut self, cx: &mut Context) -> Result<(), ()> {
+        self.tile_atlas.double_texture_size(cx)
     }
 
     /// Returns `Err` when tile cache is too small for this view.
     /// Returns the number of OpenGL draw calls, which can be decreased to `1` by increasing the
     /// size of the tile atlas.
-    pub fn draw(&mut self, source: &TileSource) -> Result<usize, usize> {
+    pub fn draw(&mut self, cx: &mut Context, source: &TileSource) -> Result<usize, usize> {
         self.tile_cache.set_view_location(View {
             source_id: source.id(),
             zoom: self.map_view.tile_zoom(),
@@ -122,6 +120,7 @@ impl<'a> MapViewGl<'a> {
         loop {
             let (textured_visible_tiles, remainder_opt, used_tiles) = {
                 self.tile_atlas.textured_visible_tiles(
+                    cx,
                     remainder,
                     max_tiles_to_use,
                     source,
@@ -179,8 +178,8 @@ impl<'a> MapViewGl<'a> {
                 vertex_data.extend(&minmax);
             }
 
-            self.buf.set_data(&vertex_data, vertex_data.len() / 4);
-            self.buf.draw(DrawMode::Triangles);
+            self.buf.set_data(cx, &vertex_data, vertex_data.len() / 4);
+            self.buf.draw(cx, DrawMode::Triangles);
 
             num_draws += 1;
 
