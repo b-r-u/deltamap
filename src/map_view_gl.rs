@@ -70,8 +70,6 @@ impl MapViewGl {
         program.add_attribute(cx, CStr::from_bytes_with_nul(b"tex_minmax\0").unwrap(), 4, 8, 4);
         check_gl_errors!(cx);
 
-        program.before_render(cx);
-
         let mut map_view = MapView::with_filling_zoom(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
 
         if map_view.zoom < MIN_ZOOM_LEVEL {

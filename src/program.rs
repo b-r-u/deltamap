@@ -6,7 +6,7 @@ use std::io::BufReader;
 use std::io::Read;
 use std::mem;
 use std::path::Path;
-use texture::{Texture, TextureId};
+use texture::Texture;
 
 
 #[derive(Clone, Debug)]
@@ -14,8 +14,6 @@ pub struct Program {
     vert_obj: u32,
     frag_obj: u32,
     program_obj: u32,
-    tex_ids: Vec<TextureId>,
-    tex_locations: Vec<i32>,
 }
 
 #[derive(Clone, Debug)]
@@ -94,8 +92,6 @@ impl Program {
                 vert_obj,
                 frag_obj,
                 program_obj,
-                tex_ids: vec![],
-                tex_locations: vec![],
             })
         }
     }
@@ -106,8 +102,7 @@ impl Program {
             let tex_loc = cx.gl.GetUniformLocation(self.program_obj, uniform_name.as_ptr() as *const _);
             check_gl_errors!(cx);
 
-            self.tex_ids.push(texture.id());
-            self.tex_locations.push(tex_loc);
+            cx.gl.Uniform1i(tex_loc, texture.unit().index() as i32);
         }
     }
 
@@ -124,18 +119,6 @@ impl Program {
             cx.gl.EnableVertexAttribArray(attrib_id as u32);
         }
         check_gl_errors!(cx);
-    }
-
-    pub fn before_render(&self, cx: &mut Context) {
-        unsafe {
-            //cx.gl.UseProgram(self.program_obj);
-            //TODO check max texture number
-            for (i, (tex_id, &tex_loc)) in self.tex_ids.iter().zip(&self.tex_locations).enumerate() {
-                cx.gl.ActiveTexture(context::gl::TEXTURE0 + i as u32);
-                cx.gl.BindTexture(context::gl::TEXTURE_2D, tex_id.id);
-                cx.gl.Uniform1i(tex_loc, i as i32);
-            }
-        }
     }
 
     pub fn id(&self) -> ProgramId {

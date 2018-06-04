@@ -10,9 +10,20 @@ pub(crate) mod gl {
     include!(concat!(env!("OUT_DIR"), "/gles_bindings.rs"));
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TextureUnit(u32);
+
+impl TextureUnit {
+    pub fn index(&self) -> u32 {
+        self.0
+    }
+}
+
 #[derive(Clone)]
 pub struct Context {
     pub(crate) gl: gl::Gl,
+    active_texture_unit: TextureUnit,
+    next_free_texture_unit: TextureUnit,
 }
 
 impl ::std::fmt::Debug for Context {
@@ -34,7 +45,12 @@ macro_rules! check_gl_errors {
 impl Context {
     pub fn from_gl_window(window: &glutin::GlWindow) -> Context {
         let gl = gl::Gl::load_with(|ptr| window.get_proc_address(ptr) as *const _);
-        let cx = Context { gl };
+        let cx = Context {
+            gl,
+            /// Initial active texture unit is supposed to be GL_TEXTURE0
+            active_texture_unit: TextureUnit(0),
+            next_free_texture_unit: TextureUnit(0),
+        };
 
         // Initialize a vertex array object (VAO) if the current OpenGL context supports it. VAOs are
         // not OpenGL ES 2.0 compatible, but are required for rendering with a core context.
@@ -121,5 +137,24 @@ impl Context {
                 height as gl::types::GLsizei,
             );
         }
+    }
+
+    pub fn set_active_texture_unit(&mut self, unit: TextureUnit) {
+        if unit != self.active_texture_unit {
+            unsafe {
+                self.gl.ActiveTexture(gl::TEXTURE0 + unit.0);
+            }
+        }
+        self.active_texture_unit = unit;
+    }
+
+    pub fn occupy_free_texture_unit(&mut self) -> TextureUnit {
+        let tu = self.next_free_texture_unit;
+
+        //TODO check against max number of texture units
+        //TODO add a way to free texture units
+        self.next_free_texture_unit = TextureUnit(self.next_free_texture_unit.0 + 1);
+
+        tu
     }
 }

@@ -1,12 +1,13 @@
 use ::context;
 use ::image;
-use context::Context;
+use context::{Context, TextureUnit};
 use image::GenericImage;
 use std::os::raw::c_void;
 
 #[derive(Clone, Debug)]
 pub struct Texture {
     texture_obj: u32,
+    texture_unit: TextureUnit,
     width: u32,
     height: u32,
     format: TextureFormat,
@@ -38,6 +39,10 @@ impl Texture {
 
     fn from_ptr(cx: &mut Context, width: u32, height: u32, format: TextureFormat, data_ptr: *const c_void) -> Texture {
         let mut texture_obj = 0_u32;
+
+        let texture_unit = cx.occupy_free_texture_unit();
+        cx.set_active_texture_unit(texture_unit);
+
         unsafe {
             cx.gl.GenTextures(1, &mut texture_obj);
             cx.gl.BindTexture(context::gl::TEXTURE_2D, texture_obj);
@@ -61,6 +66,7 @@ impl Texture {
 
         Texture {
             texture_obj,
+            texture_unit,
             width,
             height,
             format,
@@ -74,8 +80,8 @@ impl Texture {
             _ => return,
         };
 
+        cx.set_active_texture_unit(self.texture_unit);
         unsafe {
-            cx.gl.BindTexture(context::gl::TEXTURE_2D, self.texture_obj);
             cx.gl.TexSubImage2D(
                 context::gl::TEXTURE_2D,
                 0, // level
@@ -91,8 +97,8 @@ impl Texture {
     }
 
     pub fn resize(&mut self, cx: &mut Context, width: u32, height: u32) {
+        cx.set_active_texture_unit(self.texture_unit);
         unsafe {
-            cx.gl.BindTexture(context::gl::TEXTURE_2D, self.texture_obj);
             cx.gl.TexImage2D(
                 context::gl::TEXTURE_2D,
                 0, // level
@@ -113,6 +119,10 @@ impl Texture {
         TextureId {
             id: self.texture_obj,
         }
+    }
+
+    pub fn unit(&self) -> TextureUnit {
+        self.texture_unit
     }
 
     pub fn width(&self) -> u32 {
