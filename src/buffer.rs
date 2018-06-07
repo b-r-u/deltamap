@@ -1,5 +1,6 @@
 use ::context;
 use context::Context;
+use program::Program;
 use std::mem;
 
 
@@ -73,13 +74,19 @@ impl Buffer {
         self.num_elements = num_elements;
     }
 
-    pub fn draw(&self, cx: &mut Context, mode: DrawMode) {
+    pub fn draw(&self, cx: &mut Context, program: &Program, mode: DrawMode) {
         cx.bind_buffer(self.buffer_id);
+        cx.use_program(program.id());
+        program.enable_vertex_attribs(cx);
         unsafe {
             cx.gl.DrawArrays(
                 mode.to_gl_enum(),
                 0,
                 self.num_elements as context::gl::types::GLsizei);
         }
+    }
+
+    pub fn id(&self) -> BufferId {
+        self.buffer_id
     }
 }

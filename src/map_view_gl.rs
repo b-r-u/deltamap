@@ -5,9 +5,10 @@ use coord::{ScreenCoord, View};
 use map_view::MapView;
 use program::Program;
 use texture::{Texture, TextureFormat};
-use tile_cache::TileCache;
 use tile_atlas::TileAtlas;
+use tile_cache::TileCache;
 use tile_source::TileSource;
+use vertex_attrib::VertexAttribParams;
 
 
 const MIN_ZOOM_LEVEL: f64 = 0.0;
@@ -15,10 +16,10 @@ const MAX_ZOOM_LEVEL: f64 = 22.0;
 
 #[derive(Debug)]
 pub struct MapViewGl {
-    program: Program,
-    buf: Buffer,
-    viewport_size: (u32, u32),
     map_view: MapView,
+    viewport_size: (u32, u32),
+    tile_program: Program,
+    tile_buffer: Buffer,
     tile_cache: TileCache,
     tile_atlas: TileAtlas,
 }
@@ -33,14 +34,24 @@ impl MapViewGl {
         ) -> MapViewGl
         where F: Fn() + Sync + Send + 'static,
     {
-        let mut program = Program::new(
+        let tile_size = 256;
+
+        let mut map_view = MapView::with_filling_zoom(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
+
+        if map_view.zoom < MIN_ZOOM_LEVEL {
+            map_view.zoom = MIN_ZOOM_LEVEL;
+        }
+
+        let tile_buffer = Buffer::new(cx, &[], 0);
+        check_gl_errors!(cx);
+        cx.bind_buffer(tile_buffer.id());
+
+        let mut tile_program = Program::new(
             cx,
             include_bytes!("../shader/map.vert"),
             include_bytes!("../shader/map.frag"),
         ).unwrap();
         check_gl_errors!(cx);
-
-        let tile_size = 256;
 
         let atlas_size = {
             let default_size = 2048;
@@ -56,33 +67,39 @@ impl MapViewGl {
             }
         };
 
-        let tex = Texture::empty(cx, atlas_size, atlas_size, TextureFormat::Rgb8);
+        let atlas_tex = Texture::empty(cx, atlas_size, atlas_size, TextureFormat::Rgb8);
         check_gl_errors!(cx);
 
-        let buf = Buffer::new(cx, &[], 0);
+        tile_program.add_texture(cx, &atlas_tex, CStr::from_bytes_with_nul(b"tex_map\0").unwrap());
         check_gl_errors!(cx);
 
-        program.add_texture(cx, &tex, CStr::from_bytes_with_nul(b"tex_map\0").unwrap());
+        tile_program.add_attribute(
+            cx,
+            CStr::from_bytes_with_nul(b"position\0").unwrap(),
+            &VertexAttribParams::new(2, 8, 0)
+        );
+        tile_program.add_attribute(
+            cx,
+            CStr::from_bytes_with_nul(b"tex_coord\0").unwrap(),
+            &VertexAttribParams::new(2, 8, 2)
+        );
+        tile_program.add_attribute(
+            cx,
+            CStr::from_bytes_with_nul(b"tex_minmax\0").unwrap(),
+            &VertexAttribParams::new(4, 8, 4)
+        );
         check_gl_errors!(cx);
 
-        program.add_attribute(cx, CStr::from_bytes_with_nul(b"position\0").unwrap(), 2, 8, 0);
-        program.add_attribute(cx, CStr::from_bytes_with_nul(b"tex_coord\0").unwrap(), 2, 8, 2);
-        program.add_attribute(cx, CStr::from_bytes_with_nul(b"tex_minmax\0").unwrap(), 4, 8, 4);
-        check_gl_errors!(cx);
-
-        let mut map_view = MapView::with_filling_zoom(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
-
-        if map_view.zoom < MIN_ZOOM_LEVEL {
-            map_view.zoom = MIN_ZOOM_LEVEL;
-        }
+        tile_program.enable_vertex_attribs(cx);
+        tile_program.set_vertex_attribs(cx, &tile_buffer);
 
         MapViewGl {
-            program,
-            buf,
-            viewport_size: initial_size,
             map_view,
+            viewport_size: initial_size,
+            tile_program,
+            tile_buffer,
             tile_cache: TileCache::new(move |_tile| update_func(), use_network),
-            tile_atlas: TileAtlas::new(cx, tex, 256, use_async),
+            tile_atlas: TileAtlas::new(cx, atlas_tex, 256, use_async),
         }
     }
 
@@ -176,8 +193,8 @@ impl MapViewGl {
                 vertex_data.extend(&minmax);
             }
 
-            self.buf.set_data(cx, &vertex_data, vertex_data.len() / 4);
-            self.buf.draw(cx, DrawMode::Triangles);
+            self.tile_buffer.set_data(cx, &vertex_data, vertex_data.len() / 4);
+            self.tile_buffer.draw(cx, &self.tile_program, DrawMode::Triangles);
 
             num_draws += 1;
 

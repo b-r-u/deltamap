@@ -2,8 +2,10 @@ use buffer::BufferId;
 use glutin::GlContext;
 use glutin;
 use program::ProgramId;
+use std::collections::HashSet;
 use std::ffi::CStr;
 use std::mem;
+use vertex_attrib::VertexAttribLoc;
 
 pub(crate) mod gl {
     #![allow(unknown_lints)]
@@ -28,6 +30,7 @@ pub struct Context {
     next_free_texture_unit: TextureUnit,
     active_program: ProgramId,
     active_buffer: BufferId,
+    active_attribs: HashSet<VertexAttribLoc>,
 }
 
 impl ::std::fmt::Debug for Context {
@@ -56,6 +59,7 @@ impl Context {
             next_free_texture_unit: TextureUnit(0),
             active_program: ProgramId::invalid(),
             active_buffer: BufferId::invalid(),
+            active_attribs: HashSet::new(),
         };
 
         // Initialize a vertex array object (VAO) if the current OpenGL context supports it. VAOs are
@@ -179,6 +183,49 @@ impl Context {
                 self.gl.BindBuffer(gl::ARRAY_BUFFER, buf.index());
             }
             self.active_buffer = buf;
+        }
+    }
+
+    /// Enable all vertex attributes given by their location and disable all other vertex
+    /// attributes.
+    //TODO group attribs by program
+    pub fn enable_vertex_attribs(&mut self, attribs: &[VertexAttribLoc]) {
+        let new_set: HashSet<_> = attribs.iter().cloned().collect();
+
+        unsafe {
+            for old_attrib in self.active_attribs.difference(&new_set) {
+                self.gl.DisableVertexAttribArray(old_attrib.index());
+            }
+
+            for new_attrib in new_set.difference(&self.active_attribs) {
+                self.gl.EnableVertexAttribArray(new_attrib.index());
+            }
+        }
+
+        self.active_attribs = new_set;
+    }
+
+    pub fn enable_vertex_attrib(&mut self, attrib: VertexAttribLoc) {
+        if !self.active_attribs.contains(&attrib) {
+            unsafe {
+                self.gl.EnableVertexAttribArray(attrib.index());
+            }
+            self.active_attribs.insert(attrib);
+        }
+    }
+
+    /// Print status of vector attributes.
+    pub fn debug_attribs(&self) {
+        unsafe {
+            let mut max_attribs = 0i32;
+            self.gl.GetIntegerv(gl::MAX_VERTEX_ATTRIBS, &mut max_attribs as *mut _);
+
+            for index in 0..(max_attribs as u32) {
+                let mut enabled = 0i32;
+                self.gl.GetVertexAttribiv(index, gl::VERTEX_ATTRIB_ARRAY_ENABLED, &mut enabled as *mut _);
+                let enabled: bool = enabled != 0;
+                println!("attribute {} enabled: {}", index, enabled);
+            }
         }
     }
 }

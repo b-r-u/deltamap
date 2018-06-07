@@ -1,4 +1,5 @@
 use ::context;
+use buffer::Buffer;
 use context::Context;
 use std::ffi::CStr;
 use std::fs::File;
@@ -7,6 +8,7 @@ use std::io::Read;
 use std::mem;
 use std::path::Path;
 use texture::Texture;
+use vertex_attrib::{VertexAttribLoc, VertexAttribParams};
 
 
 #[derive(Clone, Debug)]
@@ -14,6 +16,8 @@ pub struct Program {
     vert_obj: u32,
     frag_obj: u32,
     program_id: ProgramId,
+    attrib_locs: Vec<VertexAttribLoc>,
+    attrib_params: Vec<VertexAttribParams>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -33,7 +37,11 @@ impl ProgramId {
 }
 
 impl Program {
-    pub fn from_paths<P: AsRef<Path>>(cx: &mut Context, vert_path: P, frag_path: P) -> Result<Program, String> {
+    pub fn from_paths<P: AsRef<Path>>(
+        cx: &mut Context,
+        vert_path: P,
+        frag_path: P,
+    ) -> Result<Program, String> {
         let vert_src = {
             let file = File::open(&vert_path)
                 .map_err(|e| format!("{}", e))?;
@@ -57,7 +65,11 @@ impl Program {
         Self::new(cx, &vert_src, &frag_src)
     }
 
-    pub fn new(cx: &mut Context, vert_src: &[u8], frag_src: &[u8]) -> Result<Program, String> {
+    pub fn new(
+        cx: &mut Context,
+        vert_src: &[u8],
+        frag_src: &[u8],
+    ) -> Result<Program, String> {
         unsafe {
             let vert_obj = {
                 let vert_obj = cx.gl.CreateShader(context::gl::VERTEX_SHADER);
@@ -100,11 +112,15 @@ impl Program {
             cx.use_program(program_id);
             check_gl_errors!(cx);
 
-            Ok(Program {
-                vert_obj,
-                frag_obj,
-                program_id,
-            })
+            Ok(
+                Program {
+                    vert_obj,
+                    frag_obj,
+                    program_id,
+                    attrib_locs: vec![],
+                    attrib_params: vec![],
+                }
+            )
         }
     }
 
@@ -119,20 +135,42 @@ impl Program {
         }
     }
 
-    pub fn add_attribute(&mut self, cx: &mut Context, name: &CStr, number_components: u32, stride: usize, offset: usize) {
+    //TODO rename function or integrate into new()
+    pub fn add_attribute(
+        &mut self,
+        cx: &mut Context,
+        name: &CStr,
+        params: &VertexAttribParams,
+    ) {
         cx.use_program(self.program_id);
-        unsafe {
-            let attrib_id = cx.gl.GetAttribLocation(self.program_id.index(), name.as_ptr() as *const _);
-            cx.gl.VertexAttribPointer(
-                attrib_id as u32,
-                number_components as i32, // size
-                context::gl::FLOAT, // type
-                0, // normalized
-                (stride * mem::size_of::<f32>()) as context::gl::types::GLsizei,
-                (offset * mem::size_of::<f32>()) as *const () as *const _);
-            cx.gl.EnableVertexAttribArray(attrib_id as u32);
+
+        let attrib_loc = unsafe {
+            cx.gl.GetAttribLocation(self.program_id.index(), name.as_ptr() as *const _)
+        };
+        if attrib_loc < 0 {
+            panic!("Attribute location not found: {:?}", name);
         }
+        let attrib_loc = VertexAttribLoc::new(attrib_loc as u32);
         check_gl_errors!(cx);
+
+        self.attrib_locs.push(attrib_loc);
+        self.attrib_params.push(params.clone());
+    }
+
+    pub fn enable_vertex_attribs(&self, cx: &mut Context) {
+        cx.enable_vertex_attribs(&self.attrib_locs)
+    }
+
+    //TODO use separate buffer for each attribute
+    pub fn set_vertex_attribs(
+        &self,
+        cx: &mut Context,
+        buffer: &Buffer,
+    ) {
+        cx.bind_buffer(buffer.id());
+        for (params, loc) in self.attrib_params.iter().zip(self.attrib_locs.iter()) {
+            params.set(cx, *loc);
+        }
     }
 
     pub fn id(&self) -> ProgramId {

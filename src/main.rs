@@ -14,10 +14,10 @@ extern crate reqwest;
 extern crate toml;
 
 pub mod args;
-#[macro_use]
-pub mod context;
 pub mod buffer;
 pub mod config;
+#[macro_use]
+pub mod context;
 pub mod coord;
 pub mod map_view;
 pub mod map_view_gl;
@@ -29,6 +29,7 @@ pub mod tile_cache;
 pub mod tile_loader;
 pub mod tile_source;
 pub mod url_template;
+pub mod vertex_attrib;
 
 use coord::ScreenCoord;
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
