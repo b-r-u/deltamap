@@ -255,7 +255,14 @@ fn run() -> Result<(), Box<Error>> {
             // Increment the counter by one for each way.
             reader.for_each(|element| {
                 match element {
-                    osmpbf::Element::Node(_) => {},
+                    osmpbf::Element::Node(node) => {
+                        for (_key, val) in node.tags() {
+                            if re.is_match(val) {
+                                marker_tx.send((node.lat(), node.lon())).unwrap();
+                                proxy.wakeup().unwrap();
+                            }
+                        }
+                    },
                     osmpbf::Element::DenseNode(dnode) => {
                         for (_key, val) in dnode.tags() {
                             if re.is_match(val) {
