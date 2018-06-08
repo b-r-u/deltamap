@@ -19,6 +19,8 @@ lazy_static! {
 pub struct Config {
     tile_cache_dir: PathBuf,
     sources: Vec<(String, TileSource)>,
+    pbf_path: Option<PathBuf>,
+    search_pattern: Option<String>,
     fps: f64,
     use_network: bool,
     async: bool,
@@ -40,12 +42,23 @@ impl Config {
             config.add_tile_sources_from_default_or_create()?;
         };
 
+        if let Some(os_path) = matches.value_of_os("pbf") {
+            let path = PathBuf::from(os_path);
+            if path.is_file() {
+                config.pbf_path = Some(path);
+            } else {
+                return Err(format!("PBF file does not exist: {:?}", os_path));
+            }
+        }
+
         config.merge_arg_matches(matches);
 
         Ok(config)
     }
 
     fn merge_arg_matches<'a>(&mut self, matches: &clap::ArgMatches<'a>) {
+        self.search_pattern = matches.value_of("search").map(|s| s.to_string());
+
         if let Some(Ok(fps)) = matches.value_of("fps").map(|s| s.parse()) {
             self.fps = fps;
         }
@@ -188,6 +201,8 @@ impl Config {
                     Config {
                         tile_cache_dir,
                         sources: vec![],
+                        pbf_path: None,
+                        search_pattern: None,
                         fps,
                         use_network,
                         async,
@@ -302,6 +317,14 @@ impl Config {
 
     pub fn tile_sources(&self) -> &[(String, TileSource)] {
         &self.sources
+    }
+
+    pub fn pbf_path(&self) -> Option<&Path> {
+        self.pbf_path.as_ref().map(|p| p.as_path())
+    }
+
+    pub fn search_pattern(&self) -> Option<&str> {
+        self.search_pattern.as_ref().map(|s| s.as_str())
     }
 
     pub fn fps(&self) -> f64 {

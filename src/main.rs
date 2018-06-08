@@ -10,6 +10,7 @@ extern crate lazy_static;
 extern crate linked_hash_map;
 #[macro_use]
 extern crate log;
+extern crate osmpbf;
 extern crate regex;
 extern crate reqwest;
 extern crate toml;
@@ -35,7 +36,11 @@ pub mod vertex_attrib;
 use coord::ScreenCoord;
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
+use regex::Regex;
 use std::error::Error;
+use std::path::PathBuf;
+use std::sync::mpsc;
+use std::thread;
 use std::time::{Duration, Instant};
 use tile_source::TileSource;
 
@@ -66,9 +71,20 @@ struct InputState {
     mouse_pressed: bool,
 }
 
-fn handle_event(event: &Event, map: &mut MapViewGl, input_state: &mut InputState, sources: &mut TileSources) -> Action {
+fn handle_event(
+    event: &Event,
+    map: &mut MapViewGl,
+    input_state: &mut InputState,
+    sources: &mut TileSources,
+    marker_rx: &mpsc::Receiver<(f64, f64)>,
+) -> Action {
     match *event {
-        Event::Awakened => Action::Redraw,
+        Event::Awakened => {
+            for (lat, lon) in marker_rx.try_iter() {
+                map.add_marker(coord::MapCoord::from_latlon(lat, lon));
+            }
+            Action::Redraw
+        },
         Event::WindowEvent{ref event, ..} => match *event {
             WindowEvent::CloseRequested => Action::Close,
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
@@ -227,6 +243,33 @@ fn run() -> Result<(), Box<Error>> {
         mouse_pressed: false,
     };
 
+    let (marker_tx, marker_rx) = mpsc::channel();
+    if let (Some(path), Some(pattern)) = (config.pbf_path(), config.search_pattern()) {
+        let pathbuf = PathBuf::from(path);
+        let re = Regex::new(pattern).unwrap();
+        let proxy = events_loop.create_proxy();
+
+        thread::spawn(move|| {
+            let reader = osmpbf::ElementReader::from_path(&pathbuf).unwrap();
+
+            // Increment the counter by one for each way.
+            reader.for_each(|element| {
+                match element {
+                    osmpbf::Element::Node(_) => {},
+                    osmpbf::Element::DenseNode(dnode) => {
+                        for (_key, val) in dnode.tags() {
+                            if re.is_match(val) {
+                                marker_tx.send((dnode.lat(), dnode.lon())).unwrap();
+                                proxy.wakeup().unwrap();
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+            }).unwrap();
+        });
+    }
+
     let duration_per_frame = Duration::from_millis((1000.0 / config.fps() - 0.5).max(0.0).floor() as u64);
     info!("milliseconds per frame: {}", dur_to_sec(duration_per_frame) * 1000.0);
 
@@ -240,7 +283,7 @@ fn run() -> Result<(), Box<Error>> {
         let mut action = Action::Nothing;
 
         events_loop.run_forever(|event| {
-            let a = handle_event(&event, &mut map, &mut input_state, &mut sources);
+            let a = handle_event(&event, &mut map, &mut input_state, &mut sources, &marker_rx);
             action.combine_with(a);
             ControlFlow::Break
         });
@@ -250,7 +293,7 @@ fn run() -> Result<(), Box<Error>> {
         }
 
         events_loop.poll_events(|event| {
-            let a = handle_event(&event, &mut map, &mut input_state, &mut sources);
+            let a = handle_event(&event, &mut map, &mut input_state, &mut sources, &marker_rx);
             action.combine_with(a);
             if action == Action::Close {
                 return;
@@ -268,7 +311,7 @@ fn run() -> Result<(), Box<Error>> {
                     std::thread::sleep(dur);
 
                     events_loop.poll_events(|event| {
-                        let a = handle_event(&event, &mut map, &mut input_state, &mut sources);
+                        let a = handle_event(&event, &mut map, &mut input_state, &mut sources, &marker_rx);
                         action.combine_with(a);
                         if action == Action::Close {
                             return;
