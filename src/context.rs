@@ -75,6 +75,12 @@ impl Context {
         info!("OpenGL version: {}", cx.gl_version());
         debug!("MAX_TEXTURE_SIZE: {}", cx.max_texture_size());
 
+        //TODO move somewhere else
+        unsafe {
+            cx.gl.Enable(gl::BLEND);
+            cx.gl.BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+        }
+
         cx
     }
 

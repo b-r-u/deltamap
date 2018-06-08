@@ -256,6 +256,10 @@ impl TileAtlas {
             y2: f64::from(slot.y * sub_coord.size + sub_coord.y + 1) * scale_y,
         }
     }
+
+    pub fn texture(&self) -> &Texture {
+        &self.texture
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

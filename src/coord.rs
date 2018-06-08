@@ -62,6 +62,13 @@ impl ScreenCoord {
         self.x = self.x.floor();
         self.y = self.y.floor();
     }
+
+    pub fn is_inside(&self, rect: &ScreenRect) -> bool {
+        self.x >= rect.x &&
+        self.y >= rect.y &&
+        self.x < rect.x + rect.width &&
+        self.y < rect.y + rect.height
+    }
 }
 
 /// A rectangle in screen coordinates.

@@ -1,3 +1,4 @@
+extern crate cgmath;
 #[macro_use]
 extern crate clap;
 extern crate directories;
