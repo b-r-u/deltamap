@@ -250,8 +250,10 @@ fn run() -> Result<(), Box<Error>> {
             path,
             pattern,
             move |lat, lon| {
-                marker_tx.send((lat, lon)).unwrap();
-                proxy.wakeup().unwrap();
+                if marker_tx.send((lat, lon)).is_err() {
+                    return search::ControlFlow::Break;
+                }
+                proxy.wakeup().into()
             },
         )?;
     }
