@@ -2,6 +2,8 @@ use osmpbf::{Element, ElementReader};
 use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::thread;
+use coord::LatLon;
+
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ControlFlow {
@@ -26,7 +28,7 @@ pub fn search_pbf<P, F>(
     update_func: F,
 ) -> Result<thread::JoinHandle<()>, String>
 where P: AsRef<Path>,
-      F: Fn(f64, f64) -> ControlFlow + Send + 'static,
+      F: Fn(LatLon) -> ControlFlow + Send + 'static,
 {
     let pathbuf = PathBuf::from(pbf_path.as_ref());
     let re = Regex::new(search_pattern)
@@ -40,17 +42,19 @@ where P: AsRef<Path>,
                 Element::Node(node) => {
                     for (_key, val) in node.tags() {
                         if re.is_match(val) {
-                            if update_func(node.lat(), node.lon()) == ControlFlow::Break {
+                            let pos = LatLon::new(node.lat(), node.lon());
+                            if update_func(pos) == ControlFlow::Break {
                                 return;
                             }
                             break;
                         }
                     }
                 },
-                Element::DenseNode(dnode) => {
-                    for (_key, val) in dnode.tags() {
+                Element::DenseNode(node) => {
+                    for (_key, val) in node.tags() {
                         if re.is_match(val) {
-                            if update_func(dnode.lat(), dnode.lon()) == ControlFlow::Break {
+                            let pos = LatLon::new(node.lat(), node.lon());
+                            if update_func(pos) == ControlFlow::Break {
                                 return;
                             }
                             break;

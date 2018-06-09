@@ -1,6 +1,20 @@
 use std::f64::consts::PI;
 use tile_source::TileSourceId;
 
+
+/// A position in latitude, longitude.
+#[derive(Copy, Debug, PartialEq, Clone)]
+pub struct LatLon {
+    pub lat: f64,
+    pub lon: f64,
+}
+
+impl LatLon {
+    pub fn new(lat: f64, lon: f64) -> Self {
+        LatLon { lat, lon }
+    }
+}
+
 /// A position in map coordinates.
 /// Valid values for x and y lie in the interval [0.0, 1.0].
 #[derive(Copy, Debug, PartialEq, Clone)]
@@ -9,16 +23,19 @@ pub struct MapCoord {
     pub y: f64,
 }
 
-impl MapCoord {
-    pub fn new(x: f64, y: f64) -> MapCoord {
-        MapCoord { x, y }
-    }
-
-    pub fn from_latlon(latitude: f64, longitude: f64) -> MapCoord {
-        let x = longitude * (1.0 / 360.0) + 0.5;
-        let pi_lat = latitude * (PI / 180.0);
+impl From<LatLon> for MapCoord
+{
+    fn from(pos: LatLon) -> MapCoord {
+        let x = pos.lon * (1.0 / 360.0) + 0.5;
+        let pi_lat = pos.lat * (PI / 180.0);
         let y = f64::ln(f64::tan(pi_lat) + 1.0 / f64::cos(pi_lat)) * (-0.5 / PI) + 0.5;
 
+        MapCoord { x, y }
+    }
+}
+
+impl MapCoord {
+    pub fn new(x: f64, y: f64) -> MapCoord {
         MapCoord { x, y }
     }
 

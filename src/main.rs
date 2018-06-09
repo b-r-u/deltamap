@@ -36,7 +36,7 @@ pub mod tile_source;
 pub mod url_template;
 pub mod vertex_attrib;
 
-use coord::ScreenCoord;
+use coord::{LatLon, ScreenCoord};
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
 use std::error::Error;
@@ -76,12 +76,12 @@ fn handle_event(
     map: &mut MapViewGl,
     input_state: &mut InputState,
     sources: &mut TileSources,
-    marker_rx: &mpsc::Receiver<(f64, f64)>,
+    marker_rx: &mpsc::Receiver<LatLon>,
 ) -> Action {
     match *event {
         Event::Awakened => {
-            for (lat, lon) in marker_rx.try_iter() {
-                map.add_marker(coord::MapCoord::from_latlon(lat, lon));
+            for pos in marker_rx.try_iter() {
+                map.add_marker(pos.into());
             }
             Action::Redraw
         },
@@ -250,8 +250,8 @@ fn run() -> Result<(), Box<Error>> {
         search::search_pbf(
             path,
             pattern,
-            move |lat, lon| {
-                if marker_tx.send((lat, lon)).is_err() {
+            move |latlon| {
+                if marker_tx.send(latlon).is_err() {
                     return search::ControlFlow::Break;
                 }
                 proxy.wakeup().into()

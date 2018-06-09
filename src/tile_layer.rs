@@ -83,7 +83,7 @@ impl TileLayer {
             program,
             buffer,
             cache: TileCache::new(update_func, use_network),
-            atlas: TileAtlas::new(cx, atlas_tex, 256, use_async),
+            atlas: TileAtlas::new(cx, atlas_tex, tile_size, use_async),
         }
     }
 
