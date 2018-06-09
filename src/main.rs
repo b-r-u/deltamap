@@ -10,9 +10,11 @@ extern crate lazy_static;
 extern crate linked_hash_map;
 #[macro_use]
 extern crate log;
+extern crate num_cpus;
 extern crate osmpbf;
 extern crate regex;
 extern crate reqwest;
+extern crate scoped_threadpool;
 extern crate toml;
 
 pub mod args;
@@ -76,11 +78,11 @@ fn handle_event(
     map: &mut MapViewGl,
     input_state: &mut InputState,
     sources: &mut TileSources,
-    marker_rx: &mpsc::Receiver<LatLon>,
+    marker_rx: &mpsc::Receiver<Vec<LatLon>>,
 ) -> Action {
     match *event {
         Event::Awakened => {
-            for pos in marker_rx.try_iter() {
+            for pos in marker_rx.try_iter().flat_map(|c| c.into_iter()) {
                 map.add_marker(pos.into());
             }
             Action::Redraw
@@ -247,14 +249,25 @@ fn run() -> Result<(), Box<Error>> {
     if let (Some(path), Some(pattern)) = (config.pbf_path(), config.search_pattern()) {
         let proxy = events_loop.create_proxy();
 
-        search::search_pbf(
+        search::par_search(
             path,
             pattern,
-            move |latlon| {
-                if marker_tx.send(latlon).is_err() {
-                    return search::ControlFlow::Break;
+            move |coords| {
+                if coords.is_empty() {
+                    search::ControlFlow::Continue
+                } else {
+                    if marker_tx.send(coords).is_err() {
+                        return search::ControlFlow::Break;
+                    }
+                    proxy.wakeup().into()
                 }
-                proxy.wakeup().into()
+            },
+            move |result| {
+                if let Err(err) = result {
+                    println!("search error: {}", err);
+                } else {
+                    info!("finished searching");
+                }
             },
         )?;
     }
