@@ -24,6 +24,7 @@ pub mod coord;
 pub mod map_view;
 pub mod map_view_gl;
 pub mod program;
+pub mod search;
 pub mod texture;
 pub mod tile;
 pub mod tile_atlas;
@@ -36,11 +37,8 @@ pub mod vertex_attrib;
 use coord::ScreenCoord;
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
-use regex::Regex;
 use std::error::Error;
-use std::path::PathBuf;
 use std::sync::mpsc;
-use std::thread;
 use std::time::{Duration, Instant};
 use tile_source::TileSource;
 
@@ -245,36 +243,16 @@ fn run() -> Result<(), Box<Error>> {
 
     let (marker_tx, marker_rx) = mpsc::channel();
     if let (Some(path), Some(pattern)) = (config.pbf_path(), config.search_pattern()) {
-        let pathbuf = PathBuf::from(path);
-        let re = Regex::new(pattern).unwrap();
         let proxy = events_loop.create_proxy();
 
-        thread::spawn(move|| {
-            let reader = osmpbf::ElementReader::from_path(&pathbuf).unwrap();
-
-            // Increment the counter by one for each way.
-            reader.for_each(|element| {
-                match element {
-                    osmpbf::Element::Node(node) => {
-                        for (_key, val) in node.tags() {
-                            if re.is_match(val) {
-                                marker_tx.send((node.lat(), node.lon())).unwrap();
-                                proxy.wakeup().unwrap();
-                            }
-                        }
-                    },
-                    osmpbf::Element::DenseNode(dnode) => {
-                        for (_key, val) in dnode.tags() {
-                            if re.is_match(val) {
-                                marker_tx.send((dnode.lat(), dnode.lon())).unwrap();
-                                proxy.wakeup().unwrap();
-                            }
-                        }
-                    },
-                    _ => {},
-                }
-            }).unwrap();
-        });
+        search::search_pbf(
+            path,
+            pattern,
+            move |lat, lon| {
+                marker_tx.send((lat, lon)).unwrap();
+                proxy.wakeup().unwrap();
+            },
+        )?;
     }
 
     let duration_per_frame = Duration::from_millis((1000.0 / config.fps() - 0.5).max(0.0).floor() as u64);
