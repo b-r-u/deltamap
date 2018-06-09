@@ -23,6 +23,7 @@ pub mod context;
 pub mod coord;
 pub mod map_view;
 pub mod map_view_gl;
+pub mod marker_layer;
 pub mod program;
 pub mod search;
 pub mod texture;
