@@ -313,8 +313,8 @@ impl MapViewGl {
         let t4 = Point2::new(0.0f32, 1.0);
 
         let visible_rect = ScreenRect {
-            x: marker_offset.x,
-            y: marker_offset.y,
+            x: -(marker_offset.x + marker_size.x),
+            y: -(marker_offset.y + marker_size.y),
             width: f64::from(self.viewport_size.0) + marker_size.x,
             height: f64::from(self.viewport_size.1) + marker_size.y,
         };
