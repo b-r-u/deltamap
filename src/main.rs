@@ -30,6 +30,7 @@ pub mod texture;
 pub mod tile;
 pub mod tile_atlas;
 pub mod tile_cache;
+pub mod tile_layer;
 pub mod tile_loader;
 pub mod tile_source;
 pub mod url_template;
