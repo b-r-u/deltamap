@@ -25,7 +25,7 @@ impl<T, E> From<Result<T, E>> for ControlFlow
 
 enum WorkerMessage {
     PleaseStop,
-    DoBlob(Blob),
+    DoBlob(Box<Blob>),
 }
 
 pub fn par_search<P, F, G>(
@@ -121,10 +121,10 @@ where P: AsRef<Path>,
         let mut stopped_threads = 0;
 
         // send initial message to each worker thread
-        for thread_id in 0..num_threads {
+        for channel in &chans {
             match reader.next() {
                 Some(Ok(blob)) => {
-                    chans[thread_id].send(WorkerMessage::DoBlob(blob))
+                    channel.send(WorkerMessage::DoBlob(Box::new(blob)))
                         .map_err(|e| format!("{}", e))?;
 
                 },
@@ -132,7 +132,7 @@ where P: AsRef<Path>,
                     return Err(format!("{}", err));
                 },
                 None => {
-                    chans[thread_id].send(WorkerMessage::PleaseStop)
+                    channel.send(WorkerMessage::PleaseStop)
                         .map_err(|e| format!("{}", e))?;
                     stopped_threads += 1;
                 },
@@ -152,7 +152,7 @@ where P: AsRef<Path>,
 
             match reader.next() {
                 Some(Ok(blob)) => {
-                    chans[thread_id].send(WorkerMessage::DoBlob(blob))
+                    chans[thread_id].send(WorkerMessage::DoBlob(Box::new(blob)))
                         .map_err(|e| format!("{}", e))?;
                 },
                 Some(Err(err)) => {
