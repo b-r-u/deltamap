@@ -218,6 +218,16 @@ fn run() -> Result<(), Box<Error>> {
     let mut sources = TileSources::new(config.tile_sources())
         .ok_or_else(|| "no tile sources provided.")?;
 
+    let last_session = if config.open_last_session() {
+        config::read_last_session().ok()
+    } else {
+        None
+    };
+
+    if let Some(tile_source) = last_session.as_ref().and_then(|s| s.tile_source.as_ref()) {
+        sources.switch_to_name(tile_source);
+    }
+
     let mut events_loop = glutin::EventsLoop::new();
     let builder = glutin::WindowBuilder::new()
         .with_title(format!("DeltaMap - {}", sources.current_name()));
@@ -241,14 +251,8 @@ fn run() -> Result<(), Box<Error>> {
         )
     };
 
-    if config.open_last_session() {
-        if let Ok(session) = config::read_last_session().as_ref() {
-            map.restore_session(session);
-
-            if let Some(ref tile_source) = session.tile_source {
-                sources.switch_to_name(tile_source);
-            }
-        }
+    if let Some(ref session) = last_session {
+        map.restore_session(session);
     }
 
     let mut input_state = InputState {
