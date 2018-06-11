@@ -1,5 +1,6 @@
 use clap;
 use directories::ProjectDirs;
+use session::Session;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -24,6 +25,7 @@ pub struct Config {
     fps: f64,
     use_network: bool,
     async: bool,
+    open_last_session: bool,
 }
 
 impl Config {
@@ -72,27 +74,6 @@ impl Config {
         }
     }
 
-    fn create_config_file<P: AsRef<Path> + Debug>(dir_path: P, file_path: P, contents: &[u8]) -> Result<(), String> {
-        if !dir_path.as_ref().is_dir() {
-            if let Err(err) = ::std::fs::create_dir_all(&dir_path) {
-                return Err(format!("failed to create config directory ({:?}): {}",
-                    dir_path,
-                    err
-                ));
-            }
-        }
-
-        let mut file = File::create(&file_path)
-            .map_err(|err| format!("failed to create config file {:?}: {}", &file_path, err))?;
-
-        file.write_all(contents)
-            .map_err(|err| format!(
-                "failed to write contents to config file {:?}: {}",
-                &file_path,
-                err
-            ))
-    }
-
     fn find_or_create() -> Result<Config, String> {
         let config_dir = PROJ_DIRS.config_dir();
         let config_file = {
@@ -108,7 +89,7 @@ impl Config {
         } else {
             // try to write a default config file
 
-            match Config::create_config_file(
+            match create_config_file(
                 config_dir,
                 &config_file,
                 DEFAULT_CONFIG.as_bytes()
@@ -136,7 +117,7 @@ impl Config {
         } else {
             // try to write a default config file
 
-            match Config::create_config_file(
+            match create_config_file(
                 config_dir,
                 &sources_file,
                 DEFAULT_TILE_SOURCES.as_bytes()
@@ -220,6 +201,14 @@ impl Config {
                     }
                 };
 
+                let open_last_session = {
+                    match table.get("open_last_session") {
+                        Some(&Value::Boolean(x)) => x,
+                        Some(_) => return Err("open_last_session has to be a boolean.".to_string()),
+                        None => false,
+                    }
+                };
+
                 Ok(
                     Config {
                         tile_cache_dir,
@@ -229,6 +218,7 @@ impl Config {
                         fps,
                         use_network,
                         async,
+                        open_last_session,
                     }
                 )
             },
@@ -361,7 +351,55 @@ impl Config {
     pub fn async(&self) -> bool {
         self.async
     }
+
+    pub fn open_last_session(&self) -> bool {
+        self.open_last_session
+    }
 }
+
+fn create_config_file<P: AsRef<Path> + Debug>(dir_path: P, file_path: P, contents: &[u8]) -> Result<(), String> {
+    if !dir_path.as_ref().is_dir() {
+        if let Err(err) = ::std::fs::create_dir_all(&dir_path) {
+            return Err(format!("failed to create config directory ({:?}): {}",
+                dir_path,
+                err
+            ));
+        }
+    }
+
+    let mut file = File::create(&file_path)
+        .map_err(|err| format!("failed to create config file {:?}: {}", &file_path, err))?;
+
+    file.write_all(contents)
+        .map_err(|err| format!(
+            "failed to write contents to config file {:?}: {}",
+            &file_path,
+            err
+        ))
+}
+
+pub fn read_last_session() -> Result<Session, String> {
+    let session_path = {
+        let config_dir = PROJ_DIRS.config_dir();
+        let mut path = PathBuf::from(config_dir);
+        path.push("last_session.toml");
+        path
+    };
+    Session::from_toml_file(session_path)
+}
+
+pub fn save_session(session: &Session) -> Result<(), String>
+{
+    let config_dir = PROJ_DIRS.config_dir();
+    let session_path = {
+        let mut path = PathBuf::from(config_dir);
+        path.push("last_session.toml");
+        path
+    };
+    let contents = session.to_toml_string();
+    create_config_file(config_dir, &session_path, contents.as_bytes())
+}
+
 
 #[cfg(test)]
 mod tests {

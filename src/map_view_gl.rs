@@ -2,6 +2,7 @@ use context::Context;
 use coord::{MapCoord, ScreenCoord};
 use map_view::MapView;
 use marker_layer::MarkerLayer;
+use session::Session;
 use tile_layer::TileLayer;
 use tile_source::TileSource;
 
@@ -148,5 +149,19 @@ impl MapViewGl {
     pub fn move_pixel(&mut self, delta_x: f64, delta_y: f64) {
         self.map_view.move_pixel(delta_x, delta_y);
         self.map_view.center.normalize_xy();
+    }
+
+    pub fn restore_session(&mut self, session: &Session) {
+        self.map_view.center = session.view_center;
+        self.map_view.center.normalize_xy();
+        self.map_view.zoom = MIN_ZOOM_LEVEL.max(MAX_ZOOM_LEVEL.min(session.zoom));
+    }
+
+    pub fn to_session(&self) -> Session {
+        Session {
+            view_center: self.map_view.center,
+            zoom: self.map_view.zoom,
+            tile_source: None,
+        }
     }
 }

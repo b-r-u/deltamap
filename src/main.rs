@@ -28,6 +28,7 @@ pub mod map_view_gl;
 pub mod marker_layer;
 pub mod program;
 pub mod search;
+pub mod session;
 pub mod texture;
 pub mod tile;
 pub mod tile_atlas;
@@ -240,6 +241,16 @@ fn run() -> Result<(), Box<Error>> {
         )
     };
 
+    if config.open_last_session() {
+        if let Ok(session) = config::read_last_session().as_ref() {
+            map.restore_session(session);
+
+            if let Some(ref tile_source) = session.tile_source {
+                sources.switch_to_name(tile_source);
+            }
+        }
+    }
+
     let mut input_state = InputState {
         mouse_position: (0.0, 0.0),
         mouse_pressed: false,
@@ -380,6 +391,12 @@ fn run() -> Result<(), Box<Error>> {
         }
     }
 
+    if config.open_last_session() {
+        let mut session = map.to_session();
+        session.tile_source = Some(sources.current_name().to_string());
+        config::save_session(&session)?;
+    }
+
     Ok(())
 }
 
@@ -423,5 +440,14 @@ impl<'a> TileSources<'a> {
 
     pub fn switch_to_prev(&mut self) {
         self.current_index = (self.current_index + self.sources.len().saturating_sub(1)) % self.sources.len();
+    }
+
+    pub fn switch_to_name(&mut self, name: &str) {
+        for (index, &(ref n, _)) in self.sources.iter().enumerate() {
+            if n == name {
+                self.current_index = index;
+                break;
+            }
+        }
     }
 }
