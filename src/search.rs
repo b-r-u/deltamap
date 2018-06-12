@@ -2,6 +2,7 @@ use coord::LatLon;
 use osmpbf::{Blob, BlobDecode, BlobReader, PrimitiveBlock};
 use regex::Regex;
 use scoped_threadpool::Pool;
+use std::collections::hash_set::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::sync_channel;
 use std::thread;
@@ -60,8 +61,9 @@ where P: AsRef<Path>,
         .map_err(|e| format!("{}", e))?;
     let re = &re;
 
-    let search = move |block: &PrimitiveBlock, _: &()| {
+    let first_pass = move |block: &PrimitiveBlock, _: &()| {
         let mut matches = vec![];
+        let mut way_node_ids = vec![];
 
         for node in block.groups().flat_map(|g| g.nodes()) {
             for (_key, val) in node.tags() {
@@ -83,13 +85,59 @@ where P: AsRef<Path>,
             }
         }
 
+        for way in block.groups().flat_map(|g| g.ways()) {
+            for (_key, val) in way.tags() {
+                if re.is_match(val) && !way.refs_slice().is_empty() {
+                    //TODO take middle node, not first one
+                    way_node_ids.push(way.refs_slice()[0]);
+                    break;
+                }
+            }
+        }
+
+        (matches, way_node_ids)
+    };
+
+    let mut way_node_ids: HashSet<i64> = HashSet::new();
+
+    par_iter_blobs(
+        &pbf_path,
+        || {},
+        first_pass,
+        |(matches, node_ids)| {
+            way_node_ids.extend(&node_ids);
+            found_func(matches)
+        },
+    )?;
+
+    let way_node_ids = &way_node_ids;
+
+    let second_pass = move |block: &PrimitiveBlock, _: &()| {
+        let mut matches = vec![];
+
+        for node in block.groups().flat_map(|g| g.nodes()) {
+            if way_node_ids.contains(&node.id()) {
+                let pos = LatLon::new(node.lat(), node.lon());
+                matches.push(pos);
+                break;
+            }
+        }
+
+        for node in block.groups().flat_map(|g| g.dense_nodes()) {
+            if way_node_ids.contains(&node.id) {
+                let pos = LatLon::new(node.lat(), node.lon());
+                matches.push(pos);
+                break;
+            }
+        }
+
         matches
     };
 
     par_iter_blobs(
-        pbf_path,
+        &pbf_path,
         || {},
-        search,
+        second_pass,
         found_func,
     )
 }
@@ -98,12 +146,12 @@ fn par_iter_blobs<P, D, R, IF, CF, RF>(
     pbf_path: P,
     init_func: IF,
     compute_func: CF,
-    result_func: RF,
+    mut result_func: RF,
 ) -> Result<(), String>
 where P: AsRef<Path>,
       IF: Fn() -> D,
       CF: Fn(&PrimitiveBlock, &D) -> R + Send + Sync,
-      RF: Fn(R) -> ControlFlow + Send + 'static,
+      RF: FnMut(R) -> ControlFlow,
       R: Send,
       D: Send,
 {
