@@ -119,7 +119,6 @@ where P: AsRef<Path>,
             if way_node_ids.contains(&node.id()) {
                 let pos = LatLon::new(node.lat(), node.lon());
                 matches.push(pos);
-                break;
             }
         }
 
@@ -127,7 +126,6 @@ where P: AsRef<Path>,
             if way_node_ids.contains(&node.id) {
                 let pos = LatLon::new(node.lat(), node.lon());
                 matches.push(pos);
-                break;
             }
         }
 
