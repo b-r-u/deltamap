@@ -458,6 +458,6 @@ mod tests {
     #[test]
     fn default_config() {
         let mut config = Config::from_toml_str::<&str>(DEFAULT_CONFIG, None).unwrap();
-        config.add_tile_sources_from_str(DEFAULT_TILE_SOURCES, None).unwrap();
+        config.add_tile_sources_from_str::<&str>(DEFAULT_TILE_SOURCES, None).unwrap();
     }
 }
