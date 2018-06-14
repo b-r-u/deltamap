@@ -213,7 +213,15 @@ fn dur_to_sec(dur: Duration) -> f64 {
 }
 
 fn run() -> Result<(), Box<Error>> {
-    let config = config::Config::from_arg_matches(&args::parse())?;
+    let config = {
+        let arg_matches = args::parse();
+        let config = config::Config::from_arg_matches(&arg_matches)?;
+        if arg_matches.is_present("list-paths") {
+            config.list_paths();
+            return Ok(());
+        }
+        config
+    };
 
     let mut sources = TileSources::new(config.tile_sources())
         .ok_or_else(|| "no tile sources provided.")?;

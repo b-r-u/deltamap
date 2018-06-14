@@ -13,6 +13,10 @@ pub fn parse<'a>() -> clap::ArgMatches<'a> {
             .value_name("FILE")
             .help("Set a custom config file")
             .takes_value(true))
+        .arg(Arg::with_name("list-paths")
+            .long("list-paths")
+            .help("Print paths of configuration files and directories \
+                and exit the program."))
         .arg(Arg::with_name("tile-sources")
             .short("t")
             .long("tile-sources")

@@ -18,6 +18,8 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct Config {
+    config_file_path: Option<PathBuf>,
+    tile_sources_file_path: Option<PathBuf>,
     tile_cache_dir: PathBuf,
     sources: Vec<(String, TileSource)>,
     pbf_path: Option<PathBuf>,
@@ -94,11 +96,16 @@ impl Config {
                 &config_file,
                 DEFAULT_CONFIG.as_bytes()
             ) {
-                Err(err) => warn!("{}", err),
-                Ok(()) => info!("create default config file {:?}", config_file),
+                Err(err) => {
+                    warn!("{}", err);
+                    Config::from_toml_str::<&str>(DEFAULT_CONFIG, None)
+                },
+                Ok(()) => {
+                    info!("create default config file {:?}", config_file);
+                    Config::from_toml_str(DEFAULT_CONFIG, Some(config_file))
+                },
             }
 
-            Config::from_toml_str::<&str>(DEFAULT_CONFIG, None)
         }
     }
 
@@ -122,11 +129,16 @@ impl Config {
                 &sources_file,
                 DEFAULT_TILE_SOURCES.as_bytes()
             ) {
-                Err(err) => warn!("{}", err),
-                Ok(()) => info!("create default tile sources file {:?}", sources_file),
+                Err(err) => {
+                    warn!("{}", err);
+                    self.add_tile_sources_from_str::<&str>(DEFAULT_TILE_SOURCES, None)
+                },
+                Ok(()) => {
+                    info!("create default tile sources file {:?}", sources_file);
+                    self.add_tile_sources_from_str(DEFAULT_TILE_SOURCES, Some(sources_file))
+                },
             }
 
-            self.add_tile_sources_from_str(DEFAULT_TILE_SOURCES)
         }
     }
 
@@ -156,7 +168,7 @@ impl Config {
                 let pbf_path = {
                     match table.get("pbf_file") {
                         Some(&Value::String(ref pbf_file)) => {
-                            match config_path {
+                            match config_path.as_ref() {
                                 Some(config_path) => {
                                     let p = config_path.as_ref().parent()
                                         .ok_or_else(|| "root path is not a valid config file.")?;
@@ -211,6 +223,8 @@ impl Config {
 
                 Ok(
                     Config {
+                        config_file_path: config_path.map(|p| PathBuf::from(p.as_ref())),
+                        tile_sources_file_path: None,
                         tile_cache_dir,
                         sources: vec![],
                         pbf_path,
@@ -236,7 +250,13 @@ impl Config {
         Config::from_toml_str(&content, Some(path))
     }
 
-    fn add_tile_sources_from_str(&mut self, toml_str: &str) -> Result<(), String> {
+    fn add_tile_sources_from_str<P>(
+        &mut self,
+        toml_str: &str,
+        file_path: Option<P>
+        ) -> Result<(), String>
+        where P: AsRef<Path>
+    {
         match toml_str.parse::<Value>() {
             Ok(Value::Table(ref table)) => {
                 let sources_array = table.get("tile_sources")
@@ -312,6 +332,8 @@ impl Config {
                         )?,
                     ));
                 }
+
+                self.tile_sources_file_path = file_path.map(|p| PathBuf::from(p.as_ref()));
                 Ok(())
             },
             Ok(_) => Err("TOML file has invalid structure. Expected a Table as the top-level element.".to_string()),
@@ -320,12 +342,40 @@ impl Config {
     }
 
     fn add_tile_sources_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
-        let mut file = File::open(path).map_err(|e| format!("{}", e))?;
+        let mut file = File::open(&path).map_err(|e| format!("{}", e))?;
 
         let mut content = String::new();
         file.read_to_string(&mut content).map_err(|e| format!("{}", e))?;
 
-        self.add_tile_sources_from_str(&content)
+        self.add_tile_sources_from_str(&content, Some(path))
+    }
+
+    pub fn list_paths(&self) {
+        let config = match self.config_file_path.as_ref() {
+            Some(path) => format!("{:?}", path),
+            None => "<None>".to_string(),
+        };
+
+        let sources = match self.tile_sources_file_path.as_ref() {
+            Some(path) => format!("{:?}", path),
+            None => "<None>".to_string(),
+        };
+
+        let pbf = match self.pbf_path.as_ref() {
+            Some(path) => format!("{:?}", path),
+            None => "<None>".to_string(),
+        };
+
+        println!("\
+            main configuration file: {}\n\
+            tile sources file:       {}\n\
+            tile cache directory:    {:?}\n\
+            OSM PBF file:            {}",
+            config,
+            sources,
+            self.tile_cache_dir,
+            pbf,
+        );
     }
 
     pub fn tile_sources(&self) -> &[(String, TileSource)] {
@@ -408,6 +458,6 @@ mod tests {
     #[test]
     fn default_config() {
         let mut config = Config::from_toml_str::<&str>(DEFAULT_CONFIG, None).unwrap();
-        config.add_tile_sources_from_str(DEFAULT_TILE_SOURCES).unwrap();
+        config.add_tile_sources_from_str(DEFAULT_TILE_SOURCES, None).unwrap();
     }
 }
