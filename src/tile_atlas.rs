@@ -140,6 +140,12 @@ impl TileAtlas {
         slot
     }
 
+    /// Return 0.5 pixels in texture coordinates for both dimensions.
+    pub fn texture_margins(&self) -> (f64, f64) {
+        (0.5 / f64::from(self.texture.width()),
+         0.5 / f64::from(self.texture.height()))
+    }
+
     /// Finds textures from the cache for a given slice of visible tiles. The texture atlas may not
     /// be big enough to hold all textures at once; a possible remainder of untextured visible tiles is
     /// returned as an `Option`.
@@ -156,8 +162,7 @@ impl TileAtlas {
     {
         let mut tvt = Vec::with_capacity(visible_tiles.len());
 
-        let inset_x = 0.5 / f64::from(self.texture.width());
-        let inset_y = 0.5 / f64::from(self.texture.height());
+        let (inset_x, inset_y) = self.texture_margins();
 
         let num_usable_slots = self.slots_lru.len();
         // The number of actually used slots may be lower, because slots can be used multiple times

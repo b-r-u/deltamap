@@ -38,12 +38,17 @@ impl GlobeTileLayer {
         program.add_attribute(
             cx,
             CStr::from_bytes_with_nul(b"position\0").unwrap(),
-            &VertexAttribParams::new(3, 5, 0)
+            &VertexAttribParams::new(3, 9, 0)
         );
         program.add_attribute(
             cx,
             CStr::from_bytes_with_nul(b"tex_coord\0").unwrap(),
-            &VertexAttribParams::new(2, 5, 3)
+            &VertexAttribParams::new(2, 9, 3)
+        );
+        program.add_attribute(
+            cx,
+            CStr::from_bytes_with_nul(b"tex_minmax\0").unwrap(),
+            &VertexAttribParams::new(4, 9, 5)
         );
         check_gl_errors!(cx);
 
@@ -115,12 +120,22 @@ impl GlobeTileLayer {
 
         let rot_mat = Transform::<Point3<f32>>::concat(&rot_mat_y, &rot_mat_x);
 
+        let (inset_x, inset_y) = tile_atlas.texture_margins();
+
         for tile_y in 0..16 {
             for tile_x in 0..16 {
                 let tc = TileCoord::new(4, tile_x, tile_y);
                 let slot = tile_atlas.store(cx, tc, source, cache, true)
                     .unwrap_or_else(TileAtlas::default_slot);
                 let texrect = tile_atlas.slot_to_texture_rect(slot);
+                let tex_minmax = texrect.inset(inset_x, inset_y);
+
+                let minmax = [
+                    tex_minmax.x1 as f32,
+                    tex_minmax.y1 as f32,
+                    tex_minmax.x2 as f32,
+                    tex_minmax.y2 as f32,
+                ];
 
                 for &(tc, sub_tile_a) in &tc.children() {
                     for &(tc, sub_tile_b) in &tc.children() {
@@ -157,11 +172,17 @@ impl GlobeTileLayer {
                         let p4 = [p4.x as f32, p4.y as f32, p4.z as f32, texrect.x1 as f32, texrect.y2 as f32];
 
                         vertex_data.extend(&p1);
+                        vertex_data.extend(&minmax);
                         vertex_data.extend(&p2);
+                        vertex_data.extend(&minmax);
                         vertex_data.extend(&p3);
+                        vertex_data.extend(&minmax);
                         vertex_data.extend(&p1);
+                        vertex_data.extend(&minmax);
                         vertex_data.extend(&p3);
+                        vertex_data.extend(&minmax);
                         vertex_data.extend(&p4);
+                        vertex_data.extend(&minmax);
                     }
                 }
             }
