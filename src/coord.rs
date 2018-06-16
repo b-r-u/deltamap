@@ -8,14 +8,14 @@ use cgmath::{Point3};
 /// latitude: [-90.0, 90.0]
 /// longitude: [-180, 180.0]
 #[derive(Copy, Debug, PartialEq, Clone)]
-pub struct LatLon {
+pub struct LatLonDeg {
     pub lat: f64,
     pub lon: f64,
 }
 
-impl LatLon {
+impl LatLonDeg {
     pub fn new(lat: f64, lon: f64) -> Self {
-        LatLon { lat, lon }
+        LatLonDeg { lat, lon }
     }
 
     pub fn to_radians(&self) -> LatLonRad {
@@ -42,9 +42,9 @@ impl LatLonRad {
         LatLonRad { lat, lon }
     }
 
-    pub fn to_degrees(&self) -> LatLon {
+    pub fn to_degrees(&self) -> LatLonDeg {
         let f = 180.0 * FRAC_1_PI;
-        LatLon {
+        LatLonDeg {
             lat: self.lat * f,
             lon: self.lon * f,
         }
@@ -89,9 +89,9 @@ pub struct MapCoord {
     pub y: f64,
 }
 
-impl From<LatLon> for MapCoord
+impl From<LatLonDeg> for MapCoord
 {
-    fn from(pos: LatLon) -> MapCoord {
+    fn from(pos: LatLonDeg) -> MapCoord {
         let x = pos.lon * (1.0 / 360.0) + 0.5;
         let pi_lat = pos.lat * (PI / 180.0);
         let y = f64::ln(f64::tan(pi_lat) + 1.0 / f64::cos(pi_lat)) * (-0.5 * FRAC_1_PI) + 0.5;
@@ -146,8 +146,8 @@ impl MapCoord {
         }
     }
 
-    pub fn to_latlon_deg(&self) -> LatLon {
-        LatLon {
+    pub fn to_latlon_deg(&self) -> LatLonDeg {
+        LatLonDeg {
             lat: (PI - self.y * (2.0 * PI)).sinh().atan() * (180.0 * FRAC_1_PI),
             lon: self.x * 360.0 - 180.0,
         }
@@ -476,7 +476,7 @@ mod tests {
     #[test]
     fn degree_radians() {
         {
-            let rad = LatLon::new(0.0, 0.0).to_radians();
+            let rad = LatLonDeg::new(0.0, 0.0).to_radians();
             assert!(approx_eq(rad.lat, 0.0));
             assert!(approx_eq(rad.lon, 0.0));
             let deg = rad.to_degrees();
@@ -484,7 +484,7 @@ mod tests {
             assert!(approx_eq(deg.lon, 0.0));
         }
         {
-            let rad = LatLon::new(-45.0, 180.0).to_radians();
+            let rad = LatLonDeg::new(-45.0, 180.0).to_radians();
             assert!(approx_eq(rad.lat, -PI / 4.0));
             assert!(approx_eq(rad.lon, PI));
             let deg = rad.to_degrees();
@@ -493,7 +493,7 @@ mod tests {
         }
 
         {
-            let mc = MapCoord::from(LatLon::new(23.45, 123.45));
+            let mc = MapCoord::from(LatLonDeg::new(23.45, 123.45));
             let deg = mc.to_latlon_rad().to_degrees();
             assert!(approx_eq(deg.lat, 23.45));
             assert!(approx_eq(deg.lon, 123.45));

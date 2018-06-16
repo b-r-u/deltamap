@@ -40,7 +40,7 @@ pub mod tile_source;
 pub mod url_template;
 pub mod vertex_attrib;
 
-use coord::{LatLon, ScreenCoord};
+use coord::{LatLonDeg, ScreenCoord};
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
 use std::error::Error;
@@ -80,7 +80,7 @@ fn handle_event(
     map: &mut MapViewGl,
     input_state: &mut InputState,
     sources: &mut TileSources,
-    marker_rx: &mpsc::Receiver<Vec<LatLon>>,
+    marker_rx: &mpsc::Receiver<Vec<LatLonDeg>>,
 ) -> Action {
     match *event {
         Event::Awakened => {

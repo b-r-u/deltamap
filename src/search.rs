@@ -1,4 +1,4 @@
-use coord::LatLon;
+use coord::LatLonDeg;
 use osmpbf::{Blob, BlobDecode, BlobReader, PrimitiveBlock};
 use regex::Regex;
 use scoped_threadpool::Pool;
@@ -36,7 +36,7 @@ pub fn par_search<P, F, G>(
     finished_func: G,
 ) -> Result<thread::JoinHandle<()>, String>
 where P: AsRef<Path>,
-      F: Fn(Vec<LatLon>) -> ControlFlow + Send + 'static,
+      F: Fn(Vec<LatLonDeg>) -> ControlFlow + Send + 'static,
       G: Fn(Result<(), String>) + Send + 'static,
 {
     let pbf_path = PathBuf::from(pbf_path.as_ref());
@@ -55,7 +55,7 @@ pub fn par_search_blocking<P, F>(
     found_func: F,
 ) -> Result<(), String>
 where P: AsRef<Path>,
-      F: Fn(Vec<LatLon>) -> ControlFlow + Send + 'static,
+      F: Fn(Vec<LatLonDeg>) -> ControlFlow + Send + 'static,
 {
     let re = Regex::new(search_pattern)
         .map_err(|e| format!("{}", e))?;
@@ -68,7 +68,7 @@ where P: AsRef<Path>,
         for node in block.groups().flat_map(|g| g.nodes()) {
             for (_key, val) in node.tags() {
                 if re.is_match(val) {
-                    let pos = LatLon::new(node.lat(), node.lon());
+                    let pos = LatLonDeg::new(node.lat(), node.lon());
                     matches.push(pos);
                     break;
                 }
@@ -78,7 +78,7 @@ where P: AsRef<Path>,
         for node in block.groups().flat_map(|g| g.dense_nodes()) {
             for (_key, val) in node.tags() {
                 if re.is_match(val) {
-                    let pos = LatLon::new(node.lat(), node.lon());
+                    let pos = LatLonDeg::new(node.lat(), node.lon());
                     matches.push(pos);
                     break;
                 }
@@ -117,14 +117,14 @@ where P: AsRef<Path>,
 
         for node in block.groups().flat_map(|g| g.nodes()) {
             if way_node_ids.contains(&node.id()) {
-                let pos = LatLon::new(node.lat(), node.lon());
+                let pos = LatLonDeg::new(node.lat(), node.lon());
                 matches.push(pos);
             }
         }
 
         for node in block.groups().flat_map(|g| g.dense_nodes()) {
             if way_node_ids.contains(&node.id) {
-                let pos = LatLon::new(node.lat(), node.lon());
+                let pos = LatLonDeg::new(node.lat(), node.lon());
                 matches.push(pos);
             }
         }
