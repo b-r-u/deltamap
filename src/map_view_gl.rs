@@ -1,8 +1,12 @@
 use context::Context;
 use coord::{MapCoord, ScreenCoord};
+use globe_tile_layer::GlobeTileLayer;
 use map_view::MapView;
 use marker_layer::MarkerLayer;
 use session::Session;
+use texture::{Texture, TextureFormat};
+use tile_atlas::TileAtlas;
+use tile_cache::TileCache;
 use tile_layer::TileLayer;
 use tile_source::TileSource;
 
@@ -14,8 +18,11 @@ const MAX_ZOOM_LEVEL: f64 = 22.0;
 pub struct MapViewGl {
     map_view: MapView,
     viewport_size: (u32, u32),
+    tile_cache: TileCache,
+    tile_atlas: TileAtlas,
     tile_layer: TileLayer,
     marker_layer: MarkerLayer,
+    globe_tile_layer: GlobeTileLayer,
     last_draw_type: DrawType,
 }
 
@@ -23,7 +30,8 @@ pub struct MapViewGl {
 enum DrawType {
     Null,
     Tiles,
-    Markers
+    Markers,
+    Globe,
 }
 
 impl MapViewGl {
@@ -44,11 +52,39 @@ impl MapViewGl {
             map_view.zoom = MIN_ZOOM_LEVEL;
         }
 
+        let atlas_size = {
+            let default_size = 2048;
+            let max_size = cx.max_texture_size() as u32;
+            if default_size <= max_size {
+                default_size
+            } else {
+                if tile_size * 3 > max_size {
+                    error!("maximal tile size ({}) is too small", max_size);
+                }
+
+                max_size
+            }
+        };
+
+        let atlas_tex = Texture::empty(cx, atlas_size, atlas_size, TextureFormat::Rgb8);
+        check_gl_errors!(cx);
+
+        let mut tile_atlas = TileAtlas::new(cx, atlas_tex, tile_size, use_async);
+        //TODO remove this
+        tile_atlas.double_texture_size(cx);
+        tile_atlas.double_texture_size(cx);
+        tile_atlas.double_texture_size(cx);
+
+        let tile_layer = TileLayer::new(cx, &tile_atlas);
+
         MapViewGl {
             map_view,
             viewport_size: initial_size,
-            tile_layer: TileLayer::new(cx, move |_| update_func(), tile_size, use_network, use_async),
+            tile_cache: TileCache::new(move |_tile| update_func(), use_network),
+            tile_atlas,
+            tile_layer,
             marker_layer: MarkerLayer::new(cx),
+            globe_tile_layer: GlobeTileLayer::new(cx),
             last_draw_type: DrawType::Null,
         }
     }
@@ -68,7 +104,7 @@ impl MapViewGl {
     }
 
     pub fn increase_atlas_size(&mut self, cx: &mut Context) -> Result<(), ()> {
-        self.tile_layer.double_atlas_size(cx)
+        self.tile_atlas.double_texture_size(cx)
     }
 
     fn draw_tiles(&mut self, cx: &mut Context, source: &TileSource, snap_to_pixel: bool)
@@ -76,10 +112,18 @@ impl MapViewGl {
     {
         if self.last_draw_type != DrawType::Tiles {
             self.last_draw_type = DrawType::Tiles;
-            self.tile_layer.prepare_draw(cx);
+            self.tile_layer.prepare_draw(cx, &self.tile_atlas);
         }
 
-        self.tile_layer.draw(cx, &self.map_view, source, self.viewport_size, snap_to_pixel)
+        self.tile_layer.draw(
+            cx,
+            &self.map_view,
+            source,
+            &mut self.tile_cache,
+            &mut self.tile_atlas,
+            self.viewport_size,
+            snap_to_pixel
+        )
     }
 
     fn draw_marker(&mut self, cx: &mut Context, snap_to_pixel: bool) {
@@ -89,6 +133,22 @@ impl MapViewGl {
         }
 
         self.marker_layer.draw(cx, &self.map_view, self.viewport_size, snap_to_pixel);
+    }
+
+    fn draw_globe(&mut self, cx: &mut Context, source: &TileSource) {
+        if self.last_draw_type != DrawType::Globe {
+            self.last_draw_type = DrawType::Globe;
+            self.globe_tile_layer.prepare_draw(cx, &self.tile_atlas);
+        }
+
+        self.globe_tile_layer.draw(
+            cx,
+            &self.map_view,
+            source,
+            &mut self.tile_cache,
+            &mut self.tile_atlas,
+            self.viewport_size,
+        );
     }
 
     /// Returns `Err` when tile cache is too small for this view.
@@ -103,6 +163,8 @@ impl MapViewGl {
         if !self.marker_layer.is_empty() {
             self.draw_marker(cx, snap_to_pixel);
         }
+
+        self.draw_globe(cx, source);
 
         ret
     }

@@ -233,7 +233,7 @@ impl TileAtlas {
         (tvt, None, used_slots)
     }
 
-    fn slot_to_texture_rect(&self, slot: CacheSlot) -> TextureRect {
+    pub fn slot_to_texture_rect(&self, slot: CacheSlot) -> TextureRect {
         let scale_x = f64::from(self.tile_size) / f64::from(self.texture.width());
         let scale_y = f64::from(self.tile_size) / f64::from(self.texture.height());
 

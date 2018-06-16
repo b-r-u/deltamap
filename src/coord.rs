@@ -1,8 +1,12 @@
-use std::f64::consts::PI;
+use std::f64::consts::{PI, FRAC_1_PI};
 use tile_source::TileSourceId;
+use cgmath::{Point3};
 
 
 /// A position in latitude, longitude.
+/// Values are in degrees and usually in these intervals:
+/// latitude: [-90.0, 90.0]
+/// longitude: [-180, 180.0]
 #[derive(Copy, Debug, PartialEq, Clone)]
 pub struct LatLon {
     pub lat: f64,
@@ -12,6 +16,53 @@ pub struct LatLon {
 impl LatLon {
     pub fn new(lat: f64, lon: f64) -> Self {
         LatLon { lat, lon }
+    }
+}
+
+//TODO Add more conversions from/to LatLonRad
+/// A position in latitude, longitude.
+/// Values are in radians and usually in these intervals:
+/// latitude: [-0.5 * π, 0.5 * π]
+/// longitude: [-π, π]
+#[derive(Copy, Debug, PartialEq, Clone)]
+pub struct LatLonRad {
+    pub lat: f64,
+    pub lon: f64,
+}
+
+impl LatLonRad {
+    pub fn new(lat: f64, lon: f64) -> Self {
+        LatLonRad { lat, lon }
+    }
+
+    pub fn to_sphere_xyz(&self, radius: f64) -> SphereXYZ {
+        SphereXYZ {
+            x: radius * self.lat.cos() * self.lon.cos(),
+            y: radius * self.lat.sin(),
+            z: radius * self.lat.cos() * self.lon.sin(),
+        }
+    }
+
+    pub fn to_sphere_point3(&self, radius: f64) -> Point3<f32> {
+        let p = self.to_sphere_xyz(radius);
+        Point3::new(
+            p.x as f32,
+            p.y as f32,
+            p.z as f32,
+        )
+    }
+}
+
+#[derive(Copy, Debug, PartialEq, Clone)]
+pub struct SphereXYZ {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+impl SphereXYZ {
+    pub fn new(x: f64, y: f64, z: f64) -> Self {
+        SphereXYZ { x, y, z }
     }
 }
 
@@ -28,7 +79,7 @@ impl From<LatLon> for MapCoord
     fn from(pos: LatLon) -> MapCoord {
         let x = pos.lon * (1.0 / 360.0) + 0.5;
         let pi_lat = pos.lat * (PI / 180.0);
-        let y = f64::ln(f64::tan(pi_lat) + 1.0 / f64::cos(pi_lat)) * (-0.5 / PI) + 0.5;
+        let y = f64::ln(f64::tan(pi_lat) + 1.0 / f64::cos(pi_lat)) * (-0.5 * FRAC_1_PI) + 0.5;
 
         MapCoord { x, y }
     }
@@ -61,6 +112,12 @@ impl MapCoord {
         self.y = 0.0f64.max(1.0f64.min(self.y));
     }
 
+    pub fn to_latlon_rad(&self) -> LatLonRad {
+        LatLonRad {
+            lat: (PI - self.y * (2.0 * PI)).sinh().atan(),
+            lon: self.x * (2.0 * PI) - PI,
+        }
+    }
 }
 
 /// A position on the screen in pixels. Top-left corner is (0.0, 0.0).
@@ -193,6 +250,20 @@ impl TileCoord {
     pub fn map_coord_north_west(&self) -> MapCoord {
         let inv_zoom_factor = f64::powi(2.0, -(self.zoom as i32));
         MapCoord::new(f64::from(self.x) * inv_zoom_factor, f64::from(self.y) * inv_zoom_factor)
+    }
+
+    // Return the LatLonRad coordinate of the top left corner of the current tile.
+    pub fn latlon_rad_north_west(&self) -> LatLonRad {
+        let factor = f64::powi(2.0, -(self.zoom as i32)) * (2.0 * PI);
+        LatLonRad::new(
+            (PI - f64::from(self.y) * factor).sinh().atan(),
+            f64::from(self.x) * factor - PI,
+        )
+    }
+
+    // Return the LatLonRad coordinate of the bottom right corner of the current tile.
+    pub fn latlon_rad_south_east(&self) -> LatLonRad {
+        TileCoord { zoom: self.zoom, x: self.x + 1, y: self.y + 1 }.latlon_rad_north_west()
     }
 
     // Return the MapCoord of the center of the current tile.

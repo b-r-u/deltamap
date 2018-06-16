@@ -4,8 +4,6 @@ use context::Context;
 use coord::View;
 use map_view::MapView;
 use program::Program;
-use texture::{Texture, TextureFormat};
-use tile::Tile;
 use tile_atlas::TileAtlas;
 use tile_cache::TileCache;
 use tile_source::TileSource;
@@ -16,20 +14,14 @@ use vertex_attrib::VertexAttribParams;
 pub struct TileLayer {
     program: Program,
     buffer: Buffer,
-    cache: TileCache,
-    atlas: TileAtlas,
 }
 
 
 impl TileLayer {
-    pub fn new<F>(
+    pub fn new(
         cx: &mut Context,
-        update_func: F,
-        tile_size: u32,
-        use_network: bool,
-        use_async: bool,
+        atlas: &TileAtlas,
     ) -> TileLayer
-        where F: Fn(Tile) + Sync + Send + 'static,
     {
         let buffer = Buffer::new(cx, &[], 0);
         check_gl_errors!(cx);
@@ -42,24 +34,7 @@ impl TileLayer {
         ).unwrap();
         check_gl_errors!(cx);
 
-        let atlas_size = {
-            let default_size = 2048;
-            let max_size = cx.max_texture_size() as u32;
-            if default_size <= max_size {
-                default_size
-            } else {
-                if tile_size * 3 > max_size {
-                    error!("maximal tile size ({}) is too small", max_size);
-                }
-
-                max_size
-            }
-        };
-
-        let atlas_tex = Texture::empty(cx, atlas_size, atlas_size, TextureFormat::Rgb8);
-        check_gl_errors!(cx);
-
-        program.add_texture(cx, &atlas_tex, CStr::from_bytes_with_nul(b"tex_map\0").unwrap());
+        program.add_texture(cx, atlas.texture(), CStr::from_bytes_with_nul(b"tex_map\0").unwrap());
         check_gl_errors!(cx);
 
         program.add_attribute(
@@ -82,20 +57,14 @@ impl TileLayer {
         TileLayer {
             program,
             buffer,
-            cache: TileCache::new(update_func, use_network),
-            atlas: TileAtlas::new(cx, atlas_tex, tile_size, use_async),
         }
     }
 
-    pub fn double_atlas_size(&mut self, cx: &mut Context) -> Result<(), ()> {
-        self.atlas.double_texture_size(cx)
-    }
-
     // Has to be called once before one or multiple calls to `draw`.
-    pub fn prepare_draw(&mut self, cx: &mut Context) {
+    pub fn prepare_draw(&mut self, cx: &mut Context, atlas: &TileAtlas) {
         self.program.enable_vertex_attribs(cx);
         self.program.set_vertex_attribs(cx, &self.buffer);
-        cx.set_active_texture_unit(self.atlas.texture().unit());
+        cx.set_active_texture_unit(atlas.texture().unit());
     }
 
     pub fn draw(
@@ -103,10 +72,12 @@ impl TileLayer {
         cx: &mut Context,
         map_view: &MapView,
         source: &TileSource,
+        cache: &mut TileCache,
+        atlas: &mut TileAtlas,
         viewport_size: (u32, u32),
         snap_to_pixel: bool
     ) -> Result<usize, usize> {
-        self.cache.set_view_location(View {
+        cache.set_view_location(View {
             source_id: source.id(),
             zoom: map_view.tile_zoom(),
             center: map_view.center,
@@ -115,16 +86,16 @@ impl TileLayer {
         let visible_tiles = map_view.visible_tiles(snap_to_pixel);
         let mut remainder = visible_tiles.as_slice();
         let mut num_draws = 0;
-        let mut max_tiles_to_use = self.cache.max_tiles();
+        let mut max_tiles_to_use = cache.max_tiles();
 
         loop {
             let (textured_visible_tiles, remainder_opt, used_tiles) = {
-                self.atlas.textured_visible_tiles(
+                atlas.textured_visible_tiles(
                     cx,
                     remainder,
                     max_tiles_to_use,
                     source,
-                    &mut self.cache,
+                    cache,
                 )
             };
 
