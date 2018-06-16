@@ -289,10 +289,23 @@ impl TileCoord {
     // Return the LatLonRad coordinate of the top left corner of the current tile.
     pub fn latlon_rad_north_west(&self) -> LatLonRad {
         let factor = f64::powi(2.0, -(self.zoom as i32)) * (2.0 * PI);
-        LatLonRad::new(
-            (PI - f64::from(self.y) * factor).sinh().atan(),
-            f64::from(self.x) * factor - PI,
-        )
+
+        if self.y == 0 {
+            LatLonRad::new(
+                0.5 * PI,
+                f64::from(self.x) * factor - PI,
+            )
+        } else if self.y == Self::get_zoom_level_tiles(self.zoom) {
+            LatLonRad::new(
+                -0.5 * PI,
+                f64::from(self.x) * factor - PI,
+            )
+        } else {
+            LatLonRad::new(
+                (PI - f64::from(self.y) * factor).sinh().atan(),
+                f64::from(self.x) * factor - PI,
+            )
+        }
     }
 
     // Return the LatLonRad coordinate of the bottom right corner of the current tile.
@@ -505,5 +518,17 @@ mod tests {
             assert!(approx_eq(rad.lat, -0.345 * PI));
             assert!(approx_eq(rad.lon, -0.987 * PI));
         }
+    }
+
+    #[test]
+    fn tile_to_latlon() {
+        // Test edge cases at the poles where the longitude is technically undefined.
+        let t = TileCoord::new(0, 0, 0);
+        let deg = t.latlon_rad_north_west();
+        assert!(approx_eq(deg.lat, 0.5 * PI));
+        assert!(approx_eq(deg.lon, -PI));
+        let deg = t.latlon_rad_south_east();
+        assert!(approx_eq(deg.lat, -0.5 * PI));
+        assert!(approx_eq(deg.lon, PI));
     }
 }
