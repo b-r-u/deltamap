@@ -161,7 +161,7 @@ impl GlobeTileLayer {
                         let p3 = transform.transform_point(p3);
                         let p4 = transform.transform_point(p4);
 
-                        if p1.z > 0.0 || p2.z > 0.0 || p3.z > 0.0 || p4.z > 0.0 {
+                        if p1.z > 0.0 && p2.z > 0.0 && p3.z > 0.0 && p4.z > 0.0 {
                             continue;
                         }
 
