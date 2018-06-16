@@ -17,9 +17,16 @@ impl LatLon {
     pub fn new(lat: f64, lon: f64) -> Self {
         LatLon { lat, lon }
     }
+
+    pub fn to_radians(&self) -> LatLonRad {
+        let f = PI / 180.0;
+        LatLonRad {
+            lat: self.lat * f,
+            lon: self.lon * f,
+        }
+    }
 }
 
-//TODO Add more conversions from/to LatLonRad
 /// A position in latitude, longitude.
 /// Values are in radians and usually in these intervals:
 /// latitude: [-0.5 * π, 0.5 * π]
@@ -33,6 +40,14 @@ pub struct LatLonRad {
 impl LatLonRad {
     pub fn new(lat: f64, lon: f64) -> Self {
         LatLonRad { lat, lon }
+    }
+
+    pub fn to_degrees(&self) -> LatLon {
+        let f = 180.0 * FRAC_1_PI;
+        LatLon {
+            lat: self.lat * f,
+            lon: self.lon * f,
+        }
     }
 
     pub fn to_sphere_xyz(&self, radius: f64) -> SphereXYZ {
@@ -80,6 +95,18 @@ impl From<LatLon> for MapCoord
         let x = pos.lon * (1.0 / 360.0) + 0.5;
         let pi_lat = pos.lat * (PI / 180.0);
         let y = f64::ln(f64::tan(pi_lat) + 1.0 / f64::cos(pi_lat)) * (-0.5 * FRAC_1_PI) + 0.5;
+        debug_assert!(y.is_finite());
+
+        MapCoord { x, y }
+    }
+}
+
+impl From<LatLonRad> for MapCoord
+{
+    fn from(pos: LatLonRad) -> MapCoord {
+        let x = pos.lon * (0.5 * FRAC_1_PI) + 0.5;
+        let y = f64::ln(f64::tan(pos.lat) + 1.0 / f64::cos(pos.lat)) * (-0.5 * FRAC_1_PI) + 0.5;
+        debug_assert!(y.is_finite());
 
         MapCoord { x, y }
     }
@@ -116,6 +143,13 @@ impl MapCoord {
         LatLonRad {
             lat: (PI - self.y * (2.0 * PI)).sinh().atan(),
             lon: self.x * (2.0 * PI) - PI,
+        }
+    }
+
+    pub fn to_latlon_deg(&self) -> LatLon {
+        LatLon {
+            lat: (PI - self.y * (2.0 * PI)).sinh().atan() * (180.0 * FRAC_1_PI),
+            lon: self.x * 360.0 - 180.0,
         }
     }
 }
@@ -423,5 +457,53 @@ mod tests {
         assert_eq!(TileCoord::new(1, 1, 1).to_quadkey(), Some("3".to_string()));
         assert_eq!(TileCoord::new(3, 1, 0).to_quadkey(), Some("001".to_string()));
         assert_eq!(TileCoord::new(30, 0, 1).to_quadkey(), Some("000000000000000000000000000002".to_string()));
+    }
+
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-10
+    }
+
+    #[test]
+    fn approx_eq_test() {
+        assert!(approx_eq(1.0, 1.0));
+        assert!(approx_eq(0.0, 0.0));
+        assert!(approx_eq(0.0, -0.0));
+        assert!(approx_eq(1e20, 1e20 + 1.0));
+        assert!(approx_eq(1e20, 1e20 - 1.0));
+        assert!(!approx_eq(1000.0, 1000.1));
+    }
+
+    #[test]
+    fn degree_radians() {
+        {
+            let rad = LatLon::new(0.0, 0.0).to_radians();
+            assert!(approx_eq(rad.lat, 0.0));
+            assert!(approx_eq(rad.lon, 0.0));
+            let deg = rad.to_degrees();
+            assert!(approx_eq(deg.lat, 0.0));
+            assert!(approx_eq(deg.lon, 0.0));
+        }
+        {
+            let rad = LatLon::new(-45.0, 180.0).to_radians();
+            assert!(approx_eq(rad.lat, -PI / 4.0));
+            assert!(approx_eq(rad.lon, PI));
+            let deg = rad.to_degrees();
+            assert!(approx_eq(deg.lat, -45.0));
+            assert!(approx_eq(deg.lon, 180.0));
+        }
+
+        {
+            let mc = MapCoord::from(LatLon::new(23.45, 123.45));
+            let deg = mc.to_latlon_rad().to_degrees();
+            assert!(approx_eq(deg.lat, 23.45));
+            assert!(approx_eq(deg.lon, 123.45));
+        }
+
+        {
+            let mc = MapCoord::from(LatLonRad::new(-0.345 * PI, -0.987 * PI));
+            let rad = mc.to_latlon_deg().to_radians();
+            assert!(approx_eq(rad.lat, -0.345 * PI));
+            assert!(approx_eq(rad.lon, -0.987 * PI));
+        }
     }
 }
