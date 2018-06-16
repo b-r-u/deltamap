@@ -88,7 +88,7 @@ impl GlobeTileLayer {
             (factor / viewport_size.0 as f32, factor / viewport_size.1 as f32)
         };
 
-        let screen_mat: Matrix3<f32> = Matrix3::from_cols(
+        let scale_mat: Matrix3<f32> = Matrix3::from_cols(
             vec3(scale_x, 0.0, 0.0),
             vec3(0.0, scale_y, 0.0),
             vec3(0.0, 0.0, 1.0),
@@ -118,7 +118,8 @@ impl GlobeTileLayer {
             )
         };
 
-        let rot_mat = Transform::<Point3<f32>>::concat(&rot_mat_y, &rot_mat_x);
+        let transform = Transform::<Point3<f32>>::concat(&rot_mat_y, &rot_mat_x);
+        let transform = Transform::<Point3<f32>>::concat(&scale_mat, &transform);
 
         let (inset_x, inset_y) = tile_atlas.texture_margins();
 
@@ -155,10 +156,10 @@ impl GlobeTileLayer {
                         let p3 = ll_se.to_sphere_point3(1.0);
                         let p4 = ll_sw.to_sphere_point3(1.0);
 
-                        let p1 = screen_mat.transform_point(rot_mat.transform_point(p1));
-                        let p2 = screen_mat.transform_point(rot_mat.transform_point(p2));
-                        let p3 = screen_mat.transform_point(rot_mat.transform_point(p3));
-                        let p4 = screen_mat.transform_point(rot_mat.transform_point(p4));
+                        let p1 = transform.transform_point(p1);
+                        let p2 = transform.transform_point(p2);
+                        let p3 = transform.transform_point(p3);
+                        let p4 = transform.transform_point(p4);
 
                         if p1.z > 0.0 || p2.z > 0.0 || p3.z > 0.0 || p4.z > 0.0 {
                             continue;
