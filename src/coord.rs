@@ -343,6 +343,18 @@ impl TileCoord {
         }
     }
 
+    pub fn children_iter(&self, zoom_delta: u32) -> TileChildrenIter {
+        let zoom_level_tiles = Self::get_zoom_level_tiles(zoom_delta);
+        TileChildrenIter {
+            zoom: self.zoom + zoom_delta,
+            tile_base_x: self.x * zoom_level_tiles,
+            tile_base_y: self.y * zoom_level_tiles,
+            child_x: -1,
+            child_y: 0,
+            zoom_level_tiles,
+        }
+    }
+
     pub fn children(&self) -> [(TileCoord, SubTileCoord); 4] {
         [
             (
@@ -429,6 +441,44 @@ impl TileCoord {
         }
 
         Some(quadkey)
+    }
+}
+
+pub struct TileChildrenIter {
+    zoom: u32,
+    tile_base_x: i32,
+    tile_base_y: i32,
+    child_x: i32,
+    child_y: i32,
+    zoom_level_tiles: i32,
+}
+
+impl Iterator for TileChildrenIter {
+    type Item = (TileCoord, SubTileCoord);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.child_x += 1;
+
+        if self.child_x >= self.zoom_level_tiles {
+            self.child_x = 0;
+            self.child_y += 1;
+        }
+        if self.child_y >= self.zoom_level_tiles {
+            return None;
+        }
+
+        Some((
+            TileCoord {
+                zoom: self.zoom,
+                x: self.tile_base_x + self.child_x,
+                y: self.tile_base_y + self.child_y,
+            },
+            SubTileCoord {
+                size: self.zoom_level_tiles as u32,
+                x: self.child_x as u32,
+                y: self.child_y as u32,
+            },
+        ))
     }
 }
 
@@ -530,5 +580,16 @@ mod tests {
         let deg = t.latlon_rad_south_east();
         assert!(approx_eq(deg.lat, -0.5 * PI));
         assert!(approx_eq(deg.lon, PI));
+    }
+
+    #[test]
+    fn tile_children() {
+        let t = TileCoord::new(2, 1, 2);
+        for (&(a1, a2), (b1, b2)) in t.children().iter().zip(t.children_iter(1)) {
+            assert_eq!(a1, b1);
+            assert_eq!(a2, b2);
+        }
+        assert_eq!(t.children_iter(1).collect::<Vec<_>>().len(), 4);
+        assert_eq!(t.children_iter(2).collect::<Vec<_>>().len(), 16);
     }
 }

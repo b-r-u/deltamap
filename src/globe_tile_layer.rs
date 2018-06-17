@@ -123,9 +123,9 @@ impl GlobeTileLayer {
 
         let (inset_x, inset_y) = tile_atlas.texture_margins();
 
-        for tile_y in 0..16 {
-            for tile_x in 0..16 {
-                let tc = TileCoord::new(4, tile_x, tile_y);
+        for tile_y in 0..8 {
+            for tile_x in 0..8 {
+                let tc = TileCoord::new(3, tile_x, tile_y);
                 let slot = tile_atlas.store(cx, tc, source, cache, true)
                     .unwrap_or_else(TileAtlas::default_slot);
                 let texrect = tile_atlas.slot_to_texture_rect(slot);
@@ -138,53 +138,49 @@ impl GlobeTileLayer {
                     tex_minmax.y2 as f32,
                 ];
 
-                for &(tc, sub_tile_a) in &tc.children() {
-                    for &(tc, sub_tile_b) in &tc.children() {
-                        let sub_tile = sub_tile_a.subdivide(&sub_tile_b);
+                for (tc, sub_tile) in tc.children_iter(3) {
+                    let ll_nw = tc.latlon_rad_north_west();
+                    let ll_se = {
+                        let tc = TileCoord::new(tc.zoom, tc.x + 1, tc.y + 1);
+                        tc.latlon_rad_north_west()
+                    };
 
-                        let ll_nw = tc.latlon_rad_north_west();
-                        let ll_se = {
-                            let tc = TileCoord::new(tc.zoom, tc.x + 1, tc.y + 1);
-                            tc.latlon_rad_north_west()
-                        };
+                    let ll_ne = LatLonRad::new(ll_nw.lat, ll_se.lon);
+                    let ll_sw = LatLonRad::new(ll_se.lat, ll_nw.lon);
 
-                        let ll_ne = LatLonRad::new(ll_nw.lat, ll_se.lon);
-                        let ll_sw = LatLonRad::new(ll_se.lat, ll_nw.lon);
+                    let p1 = ll_nw.to_sphere_point3(1.0);
+                    let p2 = ll_ne.to_sphere_point3(1.0);
+                    let p3 = ll_se.to_sphere_point3(1.0);
+                    let p4 = ll_sw.to_sphere_point3(1.0);
 
-                        let p1 = ll_nw.to_sphere_point3(1.0);
-                        let p2 = ll_ne.to_sphere_point3(1.0);
-                        let p3 = ll_se.to_sphere_point3(1.0);
-                        let p4 = ll_sw.to_sphere_point3(1.0);
+                    let p1 = transform.transform_point(p1);
+                    let p2 = transform.transform_point(p2);
+                    let p3 = transform.transform_point(p3);
+                    let p4 = transform.transform_point(p4);
 
-                        let p1 = transform.transform_point(p1);
-                        let p2 = transform.transform_point(p2);
-                        let p3 = transform.transform_point(p3);
-                        let p4 = transform.transform_point(p4);
-
-                        if p1.z > 0.0 && p2.z > 0.0 && p3.z > 0.0 && p4.z > 0.0 {
-                            continue;
-                        }
-
-                        let texrect = texrect.subdivide(&sub_tile);
-
-                        let p1 = [p1.x as f32, p1.y as f32, p1.z as f32, texrect.x1 as f32, texrect.y1 as f32];
-                        let p2 = [p2.x as f32, p2.y as f32, p2.z as f32, texrect.x2 as f32, texrect.y1 as f32];
-                        let p3 = [p3.x as f32, p3.y as f32, p3.z as f32, texrect.x2 as f32, texrect.y2 as f32];
-                        let p4 = [p4.x as f32, p4.y as f32, p4.z as f32, texrect.x1 as f32, texrect.y2 as f32];
-
-                        vertex_data.extend(&p1);
-                        vertex_data.extend(&minmax);
-                        vertex_data.extend(&p2);
-                        vertex_data.extend(&minmax);
-                        vertex_data.extend(&p3);
-                        vertex_data.extend(&minmax);
-                        vertex_data.extend(&p1);
-                        vertex_data.extend(&minmax);
-                        vertex_data.extend(&p3);
-                        vertex_data.extend(&minmax);
-                        vertex_data.extend(&p4);
-                        vertex_data.extend(&minmax);
+                    if p1.z > 0.0 && p2.z > 0.0 && p3.z > 0.0 && p4.z > 0.0 {
+                        continue;
                     }
+
+                    let texrect = texrect.subdivide(&sub_tile);
+
+                    let p1 = [p1.x as f32, p1.y as f32, p1.z as f32, texrect.x1 as f32, texrect.y1 as f32];
+                    let p2 = [p2.x as f32, p2.y as f32, p2.z as f32, texrect.x2 as f32, texrect.y1 as f32];
+                    let p3 = [p3.x as f32, p3.y as f32, p3.z as f32, texrect.x2 as f32, texrect.y2 as f32];
+                    let p4 = [p4.x as f32, p4.y as f32, p4.z as f32, texrect.x1 as f32, texrect.y2 as f32];
+
+                    vertex_data.extend(&p1);
+                    vertex_data.extend(&minmax);
+                    vertex_data.extend(&p2);
+                    vertex_data.extend(&minmax);
+                    vertex_data.extend(&p3);
+                    vertex_data.extend(&minmax);
+                    vertex_data.extend(&p1);
+                    vertex_data.extend(&minmax);
+                    vertex_data.extend(&p3);
+                    vertex_data.extend(&minmax);
+                    vertex_data.extend(&p4);
+                    vertex_data.extend(&minmax);
                 }
             }
         }
