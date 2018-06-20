@@ -194,6 +194,14 @@ fn handle_event(
                         }
                         Action::Redraw
                     },
+                    VirtualKeyCode::G => {
+                        if modifiers.ctrl {
+                            map.toggle_view_mode();
+                            Action::Redraw
+                        } else {
+                            Action::Nothing
+                        }
+                    },
                     _ => Action::Nothing,
                 }
             },
@@ -365,7 +373,7 @@ fn run() -> Result<(), Box<Error>> {
         if redraw {
             let draw_start = Instant::now();
 
-            if !map.viewport_in_map() {
+            if !map.map_covers_viewport() {
                 cx.clear_color((0.2, 0.2, 0.2, 1.0));
             }
             let draw_result = map.draw(&mut cx, sources.current());

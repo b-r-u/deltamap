@@ -23,7 +23,14 @@ pub struct MapViewGl {
     tile_layer: TileLayer,
     marker_layer: MarkerLayer,
     globe_tile_layer: GlobeTileLayer,
+    view_mode: ViewMode,
     last_draw_type: DrawType,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum ViewMode {
+    Flat,
+    Globe,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -85,6 +92,7 @@ impl MapViewGl {
             tile_layer,
             marker_layer: MarkerLayer::new(cx),
             globe_tile_layer: GlobeTileLayer::new(cx),
+            view_mode: ViewMode::Flat,
             last_draw_type: DrawType::Null,
         }
     }
@@ -99,15 +107,25 @@ impl MapViewGl {
         self.marker_layer.add_marker(map_coord);
     }
 
-    pub fn viewport_in_map(&self) -> bool {
-        self.map_view.viewport_in_map()
+    pub fn map_covers_viewport(&self) -> bool {
+        match self.view_mode {
+            ViewMode::Flat => self.map_view.map_covers_viewport(),
+            ViewMode::Globe => self.map_view.globe_covers_viewport(),
+        }
     }
 
     pub fn increase_atlas_size(&mut self, cx: &mut Context) -> Result<(), ()> {
         self.tile_atlas.double_texture_size(cx)
     }
 
-    fn draw_tiles(&mut self, cx: &mut Context, source: &TileSource, snap_to_pixel: bool)
+    pub fn toggle_view_mode(&mut self) {
+        self.view_mode = match self.view_mode {
+            ViewMode::Flat => ViewMode::Globe,
+            ViewMode::Globe => ViewMode::Flat,
+        };
+    }
+
+    fn draw_flat_tiles(&mut self, cx: &mut Context, source: &TileSource, snap_to_pixel: bool)
         -> Result<usize, usize>
     {
         if self.last_draw_type != DrawType::Tiles {
@@ -115,6 +133,7 @@ impl MapViewGl {
             self.tile_layer.prepare_draw(cx, &self.tile_atlas);
         }
 
+        //TODO remove viewport_size parameter
         self.tile_layer.draw(
             cx,
             &self.map_view,
@@ -132,6 +151,7 @@ impl MapViewGl {
             self.marker_layer.prepare_draw(cx);
         }
 
+        //TODO remove viewport_size parameter
         self.marker_layer.draw(cx, &self.map_view, self.viewport_size, snap_to_pixel);
     }
 
@@ -147,7 +167,6 @@ impl MapViewGl {
             source,
             &mut self.tile_cache,
             &mut self.tile_atlas,
-            self.viewport_size,
         );
     }
 
@@ -158,15 +177,19 @@ impl MapViewGl {
         // only snap to pixel grid if zoom has integral value
         let snap_to_pixel = (self.map_view.zoom - (self.map_view.zoom + 0.5).floor()).abs() < 1e-10;
 
-        let ret = self.draw_tiles(cx, source, snap_to_pixel);
-
-        if !self.marker_layer.is_empty() {
-            self.draw_marker(cx, snap_to_pixel);
+        match self.view_mode {
+            ViewMode::Flat => {
+                let ret = self.draw_flat_tiles(cx, source, snap_to_pixel);
+                if !self.marker_layer.is_empty() {
+                    self.draw_marker(cx, snap_to_pixel);
+                }
+                ret
+            },
+            ViewMode::Globe => {
+                self.draw_globe(cx, source);
+                Ok(1)
+            },
         }
-
-        self.draw_globe(cx, source);
-
-        ret
     }
 
     pub fn step_zoom(&mut self, steps: i32, step_size: f64) {
