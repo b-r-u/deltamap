@@ -126,15 +126,15 @@ impl MapCoord {
         TileCoord { zoom, x, y }
     }
 
+    /// Wrap around in x-direction.
+    /// Do not wrap around in y-direction. The poles don't touch.
     pub fn normalize_x(&mut self) {
-        // Wrap around in x-direction.
-        // Do not wrap around in y-direction. The poles don't touch.
         self.x = (self.x.fract() + 1.0).fract();
     }
 
+    /// Wrap around in x-direction.
+    /// Restrict y coordinates to interval [0.0, 1.0]
     pub fn normalize_xy(&mut self) {
-        // Wrap around in x-direction.
-        // Restrict y coordinates to interval [0.0, 1.0]
         self.x = (self.x.fract() + 1.0).fract();
         self.y = 0.0f64.max(1.0f64.min(self.y));
     }
@@ -414,6 +414,28 @@ impl TileCoord {
         ((coord % max) + max) % max
     }
 
+    /// Wrap around in x-direction.
+    /// Values for y that are out-of-bounds "rotate" around the globe and also influence the
+    /// x-coordinate.
+    pub fn globe_norm(&self) -> Self {
+        let max = Self::get_zoom_level_tiles(self.zoom);
+        let period = max * 2;
+
+        let yp = ((self.y % period) + period) % period;
+        let side = yp / max;
+
+        let x = self.x + side * (max / 2);
+        let x = ((x % max) + max) % max;
+
+        let y = (1 - side) * yp + side * (period - 1 - yp);
+
+        TileCoord {
+            zoom: self.zoom,
+            x: x,
+            y: y,
+        }
+    }
+
     #[inline]
     pub fn get_zoom_level_tiles(zoom: u32) -> i32 {
         //TODO throw error when zoom too big
@@ -589,7 +611,33 @@ mod tests {
             assert_eq!(a1, b1);
             assert_eq!(a2, b2);
         }
-        assert_eq!(t.children_iter(1).collect::<Vec<_>>().len(), 4);
-        assert_eq!(t.children_iter(2).collect::<Vec<_>>().len(), 16);
+        assert_eq!(t.children_iter(0).count(), 1);
+        assert_eq!(t.children_iter(0).next(), Some((t, SubTileCoord{ size: 1, x: 0, y: 0 })));
+        assert_eq!(t.children_iter(1).count(), 4);
+        assert_eq!(t.children_iter(2).count(), 16);
+    }
+
+    #[test]
+    fn globe_norm() {
+        assert_eq!(TileCoord::new(0, 0, 0).globe_norm(), TileCoord::new(0, 0, 0));
+        assert_eq!(TileCoord::new(0, -1, 0).globe_norm(), TileCoord::new(0, 0, 0));
+        assert_eq!(TileCoord::new(0, -1, -1).globe_norm(), TileCoord::new(0, 0, 0));
+        assert_eq!(TileCoord::new(0, 0, 1).globe_norm(), TileCoord::new(0, 0, 0));
+
+        assert_eq!(TileCoord::new(2, 0, 0).globe_norm(), TileCoord::new(2, 0, 0));
+        assert_eq!(TileCoord::new(2, 0, 3).globe_norm(), TileCoord::new(2, 0, 3));
+        assert_eq!(TileCoord::new(2, 0, 4).globe_norm(), TileCoord::new(2, 2, 3));
+        assert_eq!(TileCoord::new(2, 0, 5).globe_norm(), TileCoord::new(2, 2, 2));
+        assert_eq!(TileCoord::new(2, 0, 8).globe_norm(), TileCoord::new(2, 0, 0));
+
+        assert_eq!(TileCoord::new(2, 3, 0).globe_norm(), TileCoord::new(2, 3, 0));
+        assert_eq!(TileCoord::new(2, 3, 3).globe_norm(), TileCoord::new(2, 3, 3));
+        assert_eq!(TileCoord::new(2, 3, 4).globe_norm(), TileCoord::new(2, 1, 3));
+        assert_eq!(TileCoord::new(2, 3, 5).globe_norm(), TileCoord::new(2, 1, 2));
+        assert_eq!(TileCoord::new(2, 3, 8).globe_norm(), TileCoord::new(2, 3, 0));
+
+        assert_eq!(TileCoord::new(2, -1, 0).globe_norm(), TileCoord::new(2, 3, 0));
+        assert_eq!(TileCoord::new(2, 0, -1).globe_norm(), TileCoord::new(2, 2, 0));
+        assert_eq!(TileCoord::new(2, 0, -5).globe_norm(), TileCoord::new(2, 0, 3));
     }
 }
