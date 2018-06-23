@@ -2,7 +2,7 @@ use std::ffi::CStr;
 use buffer::{Buffer, DrawMode};
 use cgmath::Transform;
 use context::Context;
-use coord::{LatLonRad, TileCoord, View};
+use coord::{LatLonRad, ScreenCoord, TileCoord, View};
 use map_view::MapView;
 use program::Program;
 use tile_atlas::TileAtlas;
@@ -15,6 +15,29 @@ use vertex_attrib::VertexAttribParams;
 pub struct GlobeTileLayer {
     program: Program,
     buffer: Buffer,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct LatScreenEllipse {
+    pub center: ScreenCoord,
+    pub radius_x: f64,
+    pub radius_y: f64,
+    /// longitude angle in radians at center + radius_y
+    pub ref_angle: f64,
+}
+
+impl LatScreenEllipse {
+    fn new(view_center: LatLonRad, viewport_size: (u32, u32), globe_radius: f64, lat: f64) -> Self {
+        LatScreenEllipse {
+            center: ScreenCoord {
+                x: viewport_size.0 as f64 * 0.5,
+                y: viewport_size.1 as f64 * 0.5 * (lat - view_center.lat).sin() * globe_radius,
+            },
+            radius_x: lat.cos() * globe_radius,
+            radius_y: lat.cos() * -view_center.lat.sin() * globe_radius,
+            ref_angle: view_center.lon,
+        }
+    }
 }
 
 
@@ -110,10 +133,10 @@ impl GlobeTileLayer {
                 let ll_ne = LatLonRad::new(ll_nw.lat, ll_se.lon);
                 let ll_sw = LatLonRad::new(ll_se.lat, ll_nw.lon);
 
-                let p1 = ll_nw.to_sphere_point3(1.0);
-                let p2 = ll_ne.to_sphere_point3(1.0);
-                let p3 = ll_se.to_sphere_point3(1.0);
-                let p4 = ll_sw.to_sphere_point3(1.0);
+                let p1 = ll_nw.to_sphere_point3();
+                let p2 = ll_ne.to_sphere_point3();
+                let p3 = ll_se.to_sphere_point3();
+                let p4 = ll_sw.to_sphere_point3();
 
                 let p1 = transform.transform_point(p1);
                 let p2 = transform.transform_point(p2);

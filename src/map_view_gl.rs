@@ -110,7 +110,9 @@ impl MapViewGl {
     pub fn map_covers_viewport(&self) -> bool {
         match self.view_mode {
             ViewMode::Flat => self.map_view.map_covers_viewport(),
-            ViewMode::Globe => self.map_view.globe_covers_viewport(),
+            //TODO uncomment
+            //ViewMode::Globe => self.map_view.globe_covers_viewport(),
+            ViewMode::Globe => false,
         }
     }
 

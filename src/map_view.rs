@@ -147,6 +147,7 @@ impl MapView {
     }
 
     //TODO Put this in a new module with other "sphere things"
+    //TODO Return the transformation matrix that is used here to avoid redundant calculation.
     /// Returns a `Vec` of all tiles that are visible in the current viewport.
     pub fn visible_globe_tiles(&self) -> Vec<TileCoord> {
         let uzoom = self.tile_zoom();
@@ -166,26 +167,86 @@ impl MapView {
 
         let center_tile = self.center.on_tile_at_zoom(uzoom).globe_norm();
 
+        let transform = self.globe_transformation_matrix();
+
+        let add_tile_if_visible = |tc: TileCoord, vec: &mut Vec<TileCoord>| -> bool {
+            let nearest = tc.nearest_inside_point(self.center).to_latlon_rad().to_sphere_point3();
+            let screen_coord = transform.transform_point(nearest);
+
+            let visible = screen_coord.x >= -1.0 && screen_coord.x <= 1.0 &&
+                screen_coord.y >= -1.0 && screen_coord.y <= 1.0;
+
+            if visible {
+                vec.push(tc);
+                true
+            } else {
+                false
+            }
+        };
 
         let mut tiles = vec![];
-        tiles.push(center_tile);
 
-        // Check rings of tiles with the same Chebyshev distance to the center_tile
         {
             let zoom_level_tiles = TileCoord::get_zoom_level_tiles(uzoom);
-            let max_full_rings = (zoom_level_tiles - 1) / 2;
 
-            for radius in 1..3.min(max_full_rings + 1) {
-                let (rx1, rx2) = (center_tile.x - radius, center_tile.x + radius);
-                let (ry1, ry2) = (center_tile.y - radius, center_tile.y + radius);
-
-                for x in rx1..rx2+1 {
-                    tiles.push(TileCoord::new(uzoom, x, ry1).globe_norm());
-                    tiles.push(TileCoord::new(uzoom, x, ry2).globe_norm());
+            for dx in 0..(zoom_level_tiles / 2) {
+                let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x + dx, center_tile.y), &mut tiles);
+                if !v {
+                    break;
                 }
-                for y in ry1+1..ry2 {
-                    tiles.push(TileCoord::new(uzoom, rx1, y).globe_norm());
-                    tiles.push(TileCoord::new(uzoom, rx2, y).globe_norm());
+            }
+            for dx in 1..(1 + zoom_level_tiles / 2) {
+                let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x - dx, center_tile.y), &mut tiles);
+                if !v {
+                    break;
+                }
+            }
+
+            // move south
+            for y in (center_tile.y + 1)..zoom_level_tiles {
+                let mut visible = false;
+
+                for dx in 0..(zoom_level_tiles / 2) {
+                    let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x + dx, y), &mut tiles);
+                    visible = visible || v;
+                    if !v {
+                        break;
+                    }
+                }
+                for dx in 1..(1 + zoom_level_tiles / 2) {
+                    let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x - dx, y), &mut tiles);
+                    visible = visible || v;
+                    if !v {
+                        break;
+                    }
+                }
+
+                if !visible {
+                    break;
+                }
+            }
+
+            // move north
+            for y in (0..center_tile.y).rev() {
+                let mut visible = false;
+
+                for dx in 0..(zoom_level_tiles / 2) {
+                    let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x + dx, y), &mut tiles);
+                    visible = visible || v;
+                    if !v {
+                        break;
+                    }
+                }
+                for dx in 1..(1 + zoom_level_tiles / 2) {
+                    let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x - dx, y), &mut tiles);
+                    visible = visible || v;
+                    if !v {
+                        break;
+                    }
+                }
+
+                if !visible {
+                    break;
                 }
             }
         }
