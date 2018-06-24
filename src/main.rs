@@ -196,7 +196,7 @@ fn handle_event(
                     },
                     VirtualKeyCode::G => {
                         if modifiers.ctrl {
-                            map.toggle_view_mode();
+                            map.toggle_projection();
                             Action::Redraw
                         } else {
                             Action::Nothing

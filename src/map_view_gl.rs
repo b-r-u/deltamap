@@ -23,14 +23,16 @@ pub struct MapViewGl {
     tile_layer: TileLayer,
     marker_layer: MarkerLayer,
     globe_tile_layer: GlobeTileLayer,
-    view_mode: ViewMode,
+    projection: Projection,
     last_draw_type: DrawType,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-enum ViewMode {
-    Flat,
-    Globe,
+enum Projection {
+    // EPSG:3857: WGS 84 / Pseudo-Mercator
+    Mercator,
+    // Orthographic projection, WGS 84 coordinates mapped to the sphere
+    Orthografic,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -92,7 +94,7 @@ impl MapViewGl {
             tile_layer,
             marker_layer: MarkerLayer::new(cx),
             globe_tile_layer: GlobeTileLayer::new(cx),
-            view_mode: ViewMode::Flat,
+            projection: Projection::Mercator,
             last_draw_type: DrawType::Null,
         }
     }
@@ -108,11 +110,11 @@ impl MapViewGl {
     }
 
     pub fn map_covers_viewport(&self) -> bool {
-        match self.view_mode {
-            ViewMode::Flat => self.map_view.map_covers_viewport(),
+        match self.projection {
+            Projection::Mercator => self.map_view.map_covers_viewport(),
             //TODO uncomment
-            //ViewMode::Globe => self.map_view.globe_covers_viewport(),
-            ViewMode::Globe => false,
+            //Projection::Orthografic => self.map_view.globe_covers_viewport(),
+            Projection::Orthografic => false,
         }
     }
 
@@ -120,10 +122,10 @@ impl MapViewGl {
         self.tile_atlas.double_texture_size(cx)
     }
 
-    pub fn toggle_view_mode(&mut self) {
-        self.view_mode = match self.view_mode {
-            ViewMode::Flat => ViewMode::Globe,
-            ViewMode::Globe => ViewMode::Flat,
+    pub fn toggle_projection(&mut self) {
+        self.projection = match self.projection {
+            Projection::Mercator => Projection::Orthografic,
+            Projection::Orthografic => Projection::Mercator,
         };
     }
 
@@ -179,15 +181,15 @@ impl MapViewGl {
         // only snap to pixel grid if zoom has integral value
         let snap_to_pixel = (self.map_view.zoom - (self.map_view.zoom + 0.5).floor()).abs() < 1e-10;
 
-        match self.view_mode {
-            ViewMode::Flat => {
+        match self.projection {
+            Projection::Mercator => {
                 let ret = self.draw_flat_tiles(cx, source, snap_to_pixel);
                 if !self.marker_layer.is_empty() {
                     self.draw_marker(cx, snap_to_pixel);
                 }
                 ret
             },
-            ViewMode::Globe => {
+            Projection::Orthografic => {
                 self.draw_globe(cx, source);
                 Ok(1)
             },
