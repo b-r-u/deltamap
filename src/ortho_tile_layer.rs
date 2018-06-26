@@ -1,10 +1,11 @@
-use std::ffi::CStr;
 use buffer::{Buffer, DrawMode};
 use cgmath::Transform;
 use context::Context;
 use coord::{LatLonRad, ScreenCoord, TileCoord, View};
 use map_view::MapView;
+use orthografic_view::OrthograficView;
 use program::Program;
+use std::ffi::CStr;
 use tile_atlas::TileAtlas;
 use tile_cache::TileCache;
 use tile_source::TileSource;
@@ -12,7 +13,7 @@ use vertex_attrib::VertexAttribParams;
 
 
 #[derive(Debug)]
-pub struct GlobeTileLayer {
+pub struct OrthoTileLayer {
     program: Program,
     buffer: Buffer,
 }
@@ -27,24 +28,24 @@ pub struct LatScreenEllipse {
 }
 
 impl LatScreenEllipse {
-    fn new(view_center: LatLonRad, viewport_size: (u32, u32), globe_radius: f64, lat: f64) -> Self {
+    fn new(view_center: LatLonRad, viewport_size: (u32, u32), sphere_radius: f64, lat: f64) -> Self {
         LatScreenEllipse {
             center: ScreenCoord {
                 x: viewport_size.0 as f64 * 0.5,
-                y: viewport_size.1 as f64 * 0.5 * (lat - view_center.lat).sin() * globe_radius,
+                y: viewport_size.1 as f64 * 0.5 * (lat - view_center.lat).sin() * sphere_radius,
             },
-            radius_x: lat.cos() * globe_radius,
-            radius_y: lat.cos() * -view_center.lat.sin() * globe_radius,
+            radius_x: lat.cos() * sphere_radius,
+            radius_y: lat.cos() * -view_center.lat.sin() * sphere_radius,
             ref_angle: view_center.lon,
         }
     }
 }
 
 
-impl GlobeTileLayer {
+impl OrthoTileLayer {
     pub fn new(
         cx: &mut Context,
-    ) -> GlobeTileLayer
+    ) -> OrthoTileLayer
     {
         let buffer = Buffer::new(cx, &[], 0);
         check_gl_errors!(cx);
@@ -52,8 +53,8 @@ impl GlobeTileLayer {
 
         let mut program = Program::new(
             cx,
-            include_bytes!("../shader/globe_tile.vert"),
-            include_bytes!("../shader/globe_tile.frag"),
+            include_bytes!("../shader/ortho_tile.vert"),
+            include_bytes!("../shader/ortho_tile.frag"),
         ).unwrap();
         check_gl_errors!(cx);
 
@@ -74,7 +75,7 @@ impl GlobeTileLayer {
         );
         check_gl_errors!(cx);
 
-        GlobeTileLayer {
+        OrthoTileLayer {
             program,
             buffer,
         }
@@ -98,17 +99,17 @@ impl GlobeTileLayer {
         //TODO Add distance function to TileCache that takes topology of the sphere into account.
         cache.set_view_location(View {
             source_id: source.id(),
-            zoom: map_view.tile_zoom(),
+            zoom: OrthograficView::tile_zoom(map_view),
             center: map_view.center,
         });
 
         let mut vertex_data = vec![];
 
-        let transform = map_view.globe_transformation_matrix();
+        let transform = OrthograficView::transformation_matrix(map_view);
 
         let (inset_x, inset_y) = tile_atlas.texture_margins();
 
-        for tile_coord in map_view.visible_globe_tiles().into_iter() {
+        for tile_coord in OrthograficView::visible_tiles(map_view).into_iter() {
             let slot = tile_atlas.store(cx, tile_coord, source, cache, true)
                 .unwrap_or_else(TileAtlas::default_slot);
             let texrect = tile_atlas.slot_to_texture_rect(slot);

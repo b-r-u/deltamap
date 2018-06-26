@@ -3,6 +3,7 @@ use buffer::{Buffer, DrawMode};
 use context::Context;
 use coord::View;
 use map_view::MapView;
+use mercator_view::MercatorView;
 use program::Program;
 use tile_atlas::TileAtlas;
 use tile_cache::TileCache;
@@ -79,11 +80,11 @@ impl TileLayer {
     ) -> Result<usize, usize> {
         cache.set_view_location(View {
             source_id: source.id(),
-            zoom: map_view.tile_zoom(),
+            zoom: MercatorView::tile_zoom(map_view),
             center: map_view.center,
         });
 
-        let visible_tiles = map_view.visible_tiles(snap_to_pixel);
+        let visible_tiles = MercatorView::visible_tiles(map_view, snap_to_pixel);
         let mut remainder = visible_tiles.as_slice();
         let mut num_draws = 0;
         let mut max_tiles_to_use = cache.max_tiles();

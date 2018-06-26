@@ -23,10 +23,12 @@ pub mod config;
 #[macro_use]
 pub mod context;
 pub mod coord;
-pub mod globe_tile_layer;
+pub mod ortho_tile_layer;
 pub mod map_view;
 pub mod map_view_gl;
 pub mod marker_layer;
+pub mod mercator_view;
+pub mod orthografic_view;
 pub mod program;
 pub mod search;
 pub mod session;

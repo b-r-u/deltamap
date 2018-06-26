@@ -5,6 +5,7 @@ use context::Context;
 use coord::{MapCoord, ScreenRect};
 use image;
 use map_view::MapView;
+use mercator_view::MercatorView;
 use program::Program;
 use texture::Texture;
 use vertex_attrib::VertexAttribParams;
@@ -115,9 +116,9 @@ impl MarkerLayer {
 
         for map_pos in &self.positions {
             let screen_pos = {
-                let mut sp = map_view.map_to_screen_coord(*map_pos);
+                let mut sp = MercatorView::map_to_screen_coord(map_view, *map_pos);
                 if snap_to_pixel {
-                    let topleft = map_view.map_to_screen_coord(MapCoord::new(0.0, 0.0));
+                    let topleft = MercatorView::map_to_screen_coord(map_view, MapCoord::new(0.0, 0.0));
                     let mut snapped = topleft;
                     snapped.snap_to_pixel();
 

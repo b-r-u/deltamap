@@ -2,7 +2,7 @@ use context::Context;
 use coord::{ScreenRect, SubTileCoord, TileCoord, TextureRect};
 use image;
 use linked_hash_map::LinkedHashMap;
-use map_view::VisibleTile;
+use mercator_view::VisibleTile;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use texture::Texture;

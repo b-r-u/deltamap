@@ -357,13 +357,6 @@ impl TileCoord {
         }
     }
 
-    /// Return the coordinate inside the tile that is nearest to the given coordinate.
-    /// This function uses spherical topology.
-    pub fn nearest_inside_point(&self, other: MapCoord) -> MapCoord {
-        //TODO insert real implemenation here
-        self.map_coord_north_west()
-    }
-
     pub fn children(&self) -> [(TileCoord, SubTileCoord); 4] {
         [
             (
@@ -648,12 +641,5 @@ mod tests {
         assert_eq!(TileCoord::new(2, -1, 0).globe_norm(), TileCoord::new(2, 3, 0));
         assert_eq!(TileCoord::new(2, 0, -1).globe_norm(), TileCoord::new(2, 2, 0));
         assert_eq!(TileCoord::new(2, 0, -5).globe_norm(), TileCoord::new(2, 0, 3));
-    }
-
-    #[test]
-    fn nearest_inside_point() {
-        assert_eq!(TileCoord::new(0, 0, 0).nearest_inside_point(MapCoord::new(0.5, 0.25)), MapCoord::new(0.5, 0.25));
-        assert_eq!(TileCoord::new(2, 0, 0).nearest_inside_point(MapCoord::new(0.5, 0.5)), MapCoord::new(0.25, 0.25));
-        //TODO Add more test cases
     }
 }

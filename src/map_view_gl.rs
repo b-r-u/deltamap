@@ -1,8 +1,10 @@
 use context::Context;
 use coord::{MapCoord, ScreenCoord};
-use globe_tile_layer::GlobeTileLayer;
+use ortho_tile_layer::OrthoTileLayer;
 use map_view::MapView;
 use marker_layer::MarkerLayer;
+use mercator_view::MercatorView;
+use orthografic_view::OrthograficView;
 use session::Session;
 use texture::{Texture, TextureFormat};
 use tile_atlas::TileAtlas;
@@ -22,7 +24,7 @@ pub struct MapViewGl {
     tile_atlas: TileAtlas,
     tile_layer: TileLayer,
     marker_layer: MarkerLayer,
-    globe_tile_layer: GlobeTileLayer,
+    ortho_tile_layer: OrthoTileLayer,
     projection: Projection,
     last_draw_type: DrawType,
 }
@@ -40,7 +42,7 @@ enum DrawType {
     Null,
     Tiles,
     Markers,
-    Globe,
+    OrthoTiles,
 }
 
 impl MapViewGl {
@@ -55,7 +57,7 @@ impl MapViewGl {
     {
         let tile_size = 256;
 
-        let mut map_view = MapView::with_filling_zoom(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
+        let mut map_view = MercatorView::initial_map_view(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
 
         if map_view.zoom < MIN_ZOOM_LEVEL {
             map_view.zoom = MIN_ZOOM_LEVEL;
@@ -93,7 +95,7 @@ impl MapViewGl {
             tile_atlas,
             tile_layer,
             marker_layer: MarkerLayer::new(cx),
-            globe_tile_layer: GlobeTileLayer::new(cx),
+            ortho_tile_layer: OrthoTileLayer::new(cx),
             projection: Projection::Mercator,
             last_draw_type: DrawType::Null,
         }
@@ -111,9 +113,9 @@ impl MapViewGl {
 
     pub fn map_covers_viewport(&self) -> bool {
         match self.projection {
-            Projection::Mercator => self.map_view.map_covers_viewport(),
+            Projection::Mercator => MercatorView::covers_viewport(&self.map_view),
             //TODO uncomment
-            //Projection::Orthografic => self.map_view.globe_covers_viewport(),
+            //Projection::Orthografic => OrthograficView::covers_viewport(&self.map_view),
             Projection::Orthografic => false,
         }
     }
@@ -159,13 +161,13 @@ impl MapViewGl {
         self.marker_layer.draw(cx, &self.map_view, self.viewport_size, snap_to_pixel);
     }
 
-    fn draw_globe(&mut self, cx: &mut Context, source: &TileSource) {
-        if self.last_draw_type != DrawType::Globe {
-            self.last_draw_type = DrawType::Globe;
-            self.globe_tile_layer.prepare_draw(cx, &self.tile_atlas);
+    fn draw_ortho_tiles(&mut self, cx: &mut Context, source: &TileSource) {
+        if self.last_draw_type != DrawType::OrthoTiles {
+            self.last_draw_type = DrawType::OrthoTiles;
+            self.ortho_tile_layer.prepare_draw(cx, &self.tile_atlas);
         }
 
-        self.globe_tile_layer.draw(
+        self.ortho_tile_layer.draw(
             cx,
             &self.map_view,
             source,
@@ -190,7 +192,7 @@ impl MapViewGl {
                 ret
             },
             Projection::Orthografic => {
-                self.draw_globe(cx, source);
+                self.draw_ortho_tiles(cx, source);
                 Ok(1)
             },
         }
@@ -220,23 +222,25 @@ impl MapViewGl {
     }
 
     pub fn zoom_at(&mut self, pos: ScreenCoord, zoom_delta: f64) {
+        //TODO implement for OrthograficView
         if self.map_view.zoom + zoom_delta < MIN_ZOOM_LEVEL {
-            self.map_view.set_zoom_at(pos, MIN_ZOOM_LEVEL);
+            MercatorView::set_zoom_at(&mut self.map_view, pos, MIN_ZOOM_LEVEL);
         } else if self.map_view.zoom + zoom_delta > MAX_ZOOM_LEVEL {
-            self.map_view.set_zoom_at(pos, MAX_ZOOM_LEVEL);
+            MercatorView::set_zoom_at(&mut self.map_view, pos, MAX_ZOOM_LEVEL);
         } else {
-            self.map_view.zoom_at(pos, zoom_delta);
+            MercatorView::zoom_at(&mut self.map_view, pos, zoom_delta);
         }
         self.map_view.center.normalize_xy();
     }
 
     pub fn change_tile_zoom_offset(&mut self, delta_offset: f64) {
-        let offset = self.map_view.tile_zoom_offset();
+        let offset = self.map_view.tile_zoom_offset;
         self.map_view.set_tile_zoom_offset(offset + delta_offset);
     }
 
     pub fn move_pixel(&mut self, delta_x: f64, delta_y: f64) {
-        self.map_view.move_pixel(delta_x, delta_y);
+        //TODO implement for OrthograficView
+        MercatorView::move_pixel(&mut self.map_view, delta_x, delta_y);
         self.map_view.center.normalize_xy();
     }
 
