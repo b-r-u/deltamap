@@ -5,6 +5,95 @@ use std::f32::consts::{PI, FRAC_1_PI};
 use std::f64;
 
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum TileNeighbor {
+    Coord(TileCoord),
+    NorthPole,
+    SouthPole,
+}
+
+/// Tile neighbors using sphere topology
+pub fn tile_neighbors(origin: TileCoord, result: &mut Vec<TileNeighbor>) {
+    result.clear();
+
+    let zoom_level_tiles = TileCoord::get_zoom_level_tiles(origin.zoom);
+
+    if origin.y < 0 || origin.y >= zoom_level_tiles {
+        // Tile is out of bounds
+        return;
+    }
+
+    // Normalize x coordinate
+    let origin = TileCoord {
+        zoom: origin.zoom,
+        x: ((origin.x % zoom_level_tiles) + zoom_level_tiles) % zoom_level_tiles,
+        y: origin.y,
+    };
+
+    match (origin.zoom, origin.y) {
+        (0, _) => {},
+        (1, _) => {
+            result.extend(&[
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    (origin.x + 1) % zoom_level_tiles,
+                    origin.y)
+                ),
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    origin.x,
+                    (origin.y + 1) % zoom_level_tiles),
+                ),
+            ]);
+        },
+        (_, 0) => {
+            result.extend(&[
+                TileNeighbor::NorthPole,
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    origin.x,
+                    origin.y + 1,
+                )),
+            ]);
+        },
+        (_, y) if y == zoom_level_tiles - 1 => {
+            result.extend(&[
+                TileNeighbor::SouthPole,
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    origin.x,
+                    origin.y - 1,
+                )),
+            ]);
+        },
+        _ => {
+            result.extend(&[
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    origin.x,
+                    origin.y + 1,
+                )),
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    origin.x,
+                    origin.y - 1,
+                )),
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    (origin.x + 1) % zoom_level_tiles,
+                    origin.y,
+                )),
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    (origin.x + zoom_level_tiles - 1) % zoom_level_tiles,
+                    origin.y,
+                )),
+            ]);
+        },
+    }
+}
+
+
 #[derive(Clone, Debug)]
 pub struct OrthograficView {
 }
@@ -173,5 +262,45 @@ impl OrthograficView {
         let transform = Transform::<Point3<f32>>::concat(&rot_mat_y, &rot_mat_x);
         let transform = Transform::<Point3<f32>>::concat(&scale_mat, &transform);
         transform
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use orthografic_view::*;
+
+    #[test]
+    fn tilecoord_neighbors() {
+        let mut result = vec![];
+
+        tile_neighbors(TileCoord::new(0, 0, 0), &mut result);
+        assert!(result.is_empty());
+
+        tile_neighbors(TileCoord::new(0, 0, -1), &mut result);
+        assert!(result.is_empty());
+
+        tile_neighbors(TileCoord::new(3, 0, -1), &mut result);
+        assert!(result.is_empty());
+
+        tile_neighbors(TileCoord::new(1, 0, 0), &mut result);
+        assert_eq!(result.len(), 2);
+        assert!(result.iter().find(|&&x| x == TileNeighbor::Coord(TileCoord::new(1, 1, 0))).is_some());
+        assert!(result.iter().find(|&&x| x == TileNeighbor::Coord(TileCoord::new(1, 0, 1))).is_some());
+        assert!(result.iter().find(|&&x| x == TileNeighbor::Coord(TileCoord::new(1, 1, 1))).is_none());
+
+        tile_neighbors(TileCoord::new(2, 0, 0), &mut result);
+        assert_eq!(result.len(), 2);
+        assert!(result.iter().find(|&&x| x == TileNeighbor::NorthPole).is_some());
+
+        tile_neighbors(TileCoord::new(2, 0, 3), &mut result);
+        assert_eq!(result.len(), 2);
+        assert!(result.iter().find(|&&x| x == TileNeighbor::SouthPole).is_some());
+
+        tile_neighbors(TileCoord::new(2, 3, 1), &mut result);
+        assert_eq!(result.len(), 4);
+        assert!(result.iter().find(|&&x| x == TileNeighbor::Coord(TileCoord::new(2, 2, 1))).is_some());
+        assert!(result.iter().find(|&&x| x == TileNeighbor::Coord(TileCoord::new(2, 0, 1))).is_some());
+        assert!(result.iter().find(|&&x| x == TileNeighbor::Coord(TileCoord::new(2, 3, 0))).is_some());
+        assert!(result.iter().find(|&&x| x == TileNeighbor::Coord(TileCoord::new(2, 3, 2))).is_some());
     }
 }
