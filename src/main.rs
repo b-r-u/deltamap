@@ -44,6 +44,7 @@ pub mod vertex_attrib;
 
 use coord::{LatLonDeg, ScreenCoord};
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
+use glutin::dpi::{LogicalPosition, LogicalSize, PhysicalPosition};
 use map_view_gl::MapViewGl;
 use std::error::Error;
 use std::sync::mpsc;
@@ -51,11 +52,11 @@ use std::time::{Duration, Instant};
 use tile_source::TileSource;
 
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum Action {
     Nothing,
     Redraw,
-    Resize(u32, u32),
+    Resize(LogicalSize),
     Close,
 }
 
@@ -63,8 +64,8 @@ impl Action {
     fn combine_with(&mut self, newer_action: Self) {
         *self = match (*self, newer_action) {
             (Action::Close, _) | (_, Action::Close) => Action::Close,
-            (Action::Resize(..), Action::Resize(w, h)) => Action::Resize(w, h),
-            (Action::Resize(w, h), _) | (_, Action::Resize(w, h)) => Action::Resize(w, h),
+            (Action::Resize(..), Action::Resize(size)) => Action::Resize(size),
+            (Action::Resize(size), _) | (_, Action::Resize(size)) => Action::Resize(size),
             (Action::Redraw, _) | (_, Action::Redraw) => Action::Redraw,
             (Action::Nothing, Action::Nothing) => Action::Nothing,
         };
@@ -73,8 +74,10 @@ impl Action {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 struct InputState {
-    mouse_position: (f64, f64),
+    mouse_position: LogicalPosition,
     mouse_pressed: bool,
+    viewport_size: LogicalSize,
+    dpi_factor: f64,
 }
 
 fn handle_event(
@@ -101,46 +104,51 @@ fn handle_event(
                 input_state.mouse_pressed = false;
                 Action::Nothing
             },
-            WindowEvent::CursorMoved { position: (x, y), .. } => {
+            WindowEvent::CursorMoved { position: pos, .. } => {
                 if input_state.mouse_pressed {
                     map.move_pixel(
-                        input_state.mouse_position.0 - x,
-                        input_state.mouse_position.1 - y,
+                        (input_state.mouse_position.x - pos.x) * input_state.dpi_factor,
+                        (input_state.mouse_position.y - pos.y) * input_state.dpi_factor,
                     );
-                    input_state.mouse_position = (x, y);
+                    input_state.mouse_position = pos;
                     Action::Redraw
                 } else {
-                    input_state.mouse_position = (x, y);
+                    input_state.mouse_position = pos;
                     Action::Nothing
                 }
             },
             WindowEvent::MouseWheel { delta, modifiers, .. } => {
-                let (dx, dy) = match delta {
+                let delta: PhysicalPosition = match delta {
                     MouseScrollDelta::LineDelta(dx, dy) => {
                         // filter strange wheel events with huge values.
                         // (maybe this is just a personal touchpad driver issue)
                         if dx.abs() < 16.0 && dy.abs() < 16.0 {
                             //TODO find a sensible line height value (servo (the glutin port) uses 38)
-                            (dx, dy * 38.0)
+                            PhysicalPosition::new(
+                                f64::from(dx) * input_state.dpi_factor,
+                                f64::from(dy) * 38.0 * input_state.dpi_factor,
+                            )
                         } else {
-                            (0.0, 0.0)
+                            PhysicalPosition::new(0.0, 0.0)
                         }
                     },
-                    MouseScrollDelta::PixelDelta(dx, dy) => (dx, dy),
+                    MouseScrollDelta::PixelDelta(size) => {
+                        size.to_physical(input_state.dpi_factor)
+                    }
                 };
 
                 //TODO add option for default mouse wheel behavior (scroll or zoom?)
                 //TODO add option to reverse scroll/zoom direction
 
                 if modifiers.ctrl {
-                    map.move_pixel(f64::from(-dx), f64::from(-dy));
+                    map.move_pixel(-delta.x, -delta.y);
                 } else {
                     map.zoom_at(
                         ScreenCoord::new(
-                            input_state.mouse_position.0,
-                            input_state.mouse_position.1,
+                            input_state.mouse_position.x * input_state.dpi_factor,
+                            input_state.mouse_position.y * input_state.dpi_factor,
                         ),
-                        f64::from(dy) * (1.0 / 320.0),
+                        f64::from(delta.y) * (1.0 / 320.0),
                     );
                 }
                 Action::Redraw
@@ -210,9 +218,15 @@ fn handle_event(
             WindowEvent::Refresh => {
                 Action::Redraw
             },
-            WindowEvent::Resized(w, h) => {
-                Action::Resize(w, h)
+            WindowEvent::Resized(size) => {
+                input_state.viewport_size = size;
+                Action::Resize(size)
             },
+            WindowEvent::HiDpiFactorChanged(dpi_factor) => {
+                input_state.dpi_factor = dpi_factor;
+                map.set_dpi_factor(dpi_factor);
+                Action::Resize(input_state.viewport_size)
+            }
             _ => Action::Nothing,
         },
         _ => Action::Nothing,
@@ -258,12 +272,20 @@ fn run() -> Result<(), Box<Error>> {
     let _ = unsafe { gl_window.make_current() };
     let mut cx = context::Context::from_gl_window(&gl_window);
 
+    let mut input_state = InputState {
+        mouse_position: LogicalPosition::new(0.0, 0.0),
+        mouse_pressed: false,
+        viewport_size: window.get_inner_size().unwrap(),
+        dpi_factor: window.get_hidpi_factor(),
+    };
+
     let mut map = {
         let proxy = events_loop.create_proxy();
 
         map_view_gl::MapViewGl::new(
             &mut cx,
-            window.get_inner_size().unwrap(),
+            input_state.viewport_size.to_physical(input_state.dpi_factor).into(),
+            input_state.dpi_factor,
             move || { proxy.wakeup().unwrap(); },
             config.use_network(),
             config.async(),
@@ -273,11 +295,6 @@ fn run() -> Result<(), Box<Error>> {
     if let Some(ref session) = last_session {
         map.restore_session(session);
     }
-
-    let mut input_state = InputState {
-        mouse_position: (0.0, 0.0),
-        mouse_pressed: false,
-    };
 
     let (marker_tx, marker_rx) = mpsc::channel();
     if let (Some(path), Some(pattern)) = (config.pbf_path(), config.search_pattern()) {
@@ -361,9 +378,12 @@ fn run() -> Result<(), Box<Error>> {
             }
         }
 
-        if let Action::Resize(w, h) = action {
-            gl_window.resize(w, h);
-            map.set_viewport_size(&mut cx, w, h);
+        if let Action::Resize(size) = action {
+            let phys_size = size.to_physical(input_state.dpi_factor);
+            gl_window.resize(phys_size);
+
+            let phys_size: (u32, u32) = phys_size.into();
+            map.set_viewport_size(&mut cx, phys_size.0, phys_size.1);
         }
 
         let redraw = match action {

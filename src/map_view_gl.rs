@@ -4,7 +4,6 @@ use ortho_tile_layer::OrthoTileLayer;
 use map_view::MapView;
 use marker_layer::MarkerLayer;
 use mercator_view::MercatorView;
-use orthografic_view::OrthograficView;
 use session::Session;
 use texture::{Texture, TextureFormat};
 use tile_atlas::TileAtlas;
@@ -19,7 +18,9 @@ const MAX_ZOOM_LEVEL: f64 = 22.0;
 #[derive(Debug)]
 pub struct MapViewGl {
     map_view: MapView,
+    /// Size in physical pixels
     viewport_size: (u32, u32),
+    dpi_factor: f64,
     tile_cache: TileCache,
     tile_atlas: TileAtlas,
     tile_layer: TileLayer,
@@ -49,6 +50,7 @@ impl MapViewGl {
     pub fn new<F>(
         cx: &mut Context,
         initial_size: (u32, u32),
+        dpi_factor: f64,
         update_func: F,
         use_network: bool,
         use_async: bool,
@@ -91,6 +93,7 @@ impl MapViewGl {
         MapViewGl {
             map_view,
             viewport_size: initial_size,
+            dpi_factor,
             tile_cache: TileCache::new(move |_tile| update_func(), use_network),
             tile_atlas,
             tile_layer,
@@ -105,6 +108,10 @@ impl MapViewGl {
         self.viewport_size = (width, height);
         self.map_view.set_size(f64::from(width), f64::from(height));
         cx.set_viewport(0, 0, width, height);
+    }
+
+    pub fn set_dpi_factor(&mut self, dpi_factor: f64) {
+        self.dpi_factor = dpi_factor;
     }
 
     pub fn add_marker(&mut self, map_coord: MapCoord) {
@@ -158,7 +165,13 @@ impl MapViewGl {
         }
 
         //TODO remove viewport_size parameter
-        self.marker_layer.draw(cx, &self.map_view, self.viewport_size, snap_to_pixel);
+        self.marker_layer.draw(
+            cx,
+            &self.map_view,
+            self.viewport_size,
+            self.dpi_factor,
+            snap_to_pixel,
+        );
     }
 
     fn draw_ortho_tiles(&mut self, cx: &mut Context, source: &TileSource) {
@@ -238,6 +251,7 @@ impl MapViewGl {
         self.map_view.set_tile_zoom_offset(offset + delta_offset);
     }
 
+    //TODO Make sure to use physical pixel deltas
     pub fn move_pixel(&mut self, delta_x: f64, delta_y: f64) {
         //TODO implement for OrthograficView
         MercatorView::move_pixel(&mut self.map_view, delta_x, delta_y);

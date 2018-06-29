@@ -32,6 +32,7 @@ impl MarkerLayer {
         ).unwrap();
         check_gl_errors!(cx);
 
+        //TODO Create textures for higher DPI factors / use mipmaps
         let texture = {
             let img = image::load_from_memory(
                 include_bytes!("../img/marker.png"),
@@ -80,12 +81,13 @@ impl MarkerLayer {
         cx: &mut Context,
         map_view: &MapView,
         viewport_size: (u32, u32),
+        dpi_factor: f64,
         snap_to_pixel: bool
     ) {
         let mut vertex_data: Vec<f32> = vec![];
 
-        let marker_size = vec2::<f64>(40.0, 50.0);
-        let marker_offset = vec2::<f64>(-20.0, -50.0);
+        let marker_size = vec2::<f64>(40.0, 50.0) * dpi_factor;
+        let marker_offset = vec2::<f64>(-20.0, -50.0) * dpi_factor;
 
         let scale_x = 2.0 / viewport_size.0 as f32;
         let scale_y = -2.0 / viewport_size.1 as f32;

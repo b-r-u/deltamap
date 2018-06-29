@@ -156,7 +156,7 @@ impl MapCoord {
     }
 }
 
-/// A position on the screen in pixels. Top-left corner is (0.0, 0.0).
+/// A position on the screen in physical pixels. Top-left corner is (0.0, 0.0).
 #[derive(Copy, Clone, Debug)]
 pub struct ScreenCoord {
     pub x: f64,
@@ -181,7 +181,7 @@ impl ScreenCoord {
     }
 }
 
-/// A rectangle in screen coordinates.
+/// A rectangle in screen coordinates. Position and size are in physical pixels.
 #[derive(Copy, Clone, Debug)]
 pub struct ScreenRect {
     pub x: f64,
