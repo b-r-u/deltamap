@@ -1,11 +1,12 @@
 use cgmath::{Matrix3, Point3, Transform, vec3};
-use coord::TileCoord;
+use coord::{LatLonRad, TileCoord};
 use map_view::MapView;
+use std::collections::HashSet;
 use std::f32::consts::{PI, FRAC_1_PI};
 use std::f64;
 
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TileNeighbor {
     Coord(TileCoord),
     NorthPole,
@@ -137,85 +138,58 @@ impl OrthograficView {
 
         let transform = Self::transformation_matrix(map_view);
 
-        let add_tile_if_visible = |tc: TileCoord, vec: &mut Vec<TileCoord>| -> bool {
-            let test_point = tc.latlon_rad_north_west().to_sphere_point3();
-            let test_point = transform.transform_point(test_point);
+        let point_on_screen = |p: &Point3<f32>| {
+            p.x >= -1.0 && p.x <= 1.0 && p.y >= -1.0 && p.y <= 1.0
+        };
 
-            let visible = test_point.x >= -1.0 && test_point.x <= 1.0 &&
-                test_point.y >= -1.0 && test_point.y <= 1.0;
+        let tile_is_visible = |tc: TileCoord| -> bool {
+            let nw = tc.latlon_rad_north_west();
+            let se = tc.latlon_rad_south_east();
+            let vertices = [
+                transform.transform_point(nw.to_sphere_point3()),
+                transform.transform_point(se.to_sphere_point3()),
+                transform.transform_point(LatLonRad::new(nw.lat, se.lon).to_sphere_point3()),
+                transform.transform_point(LatLonRad::new(se.lat, nw.lon).to_sphere_point3()),
+            ];
 
-            if visible {
-                vec.push(tc);
-                true
+            if vertices.iter().all(|v| v.z > 0.0) {
+                // Tile is on the backside of the sphere
+                return false;
             } else {
-                false
+                return vertices.iter().any(&point_on_screen);
             }
         };
 
-        let mut tiles = vec![];
+        let mut tiles = vec![center_tile];
 
-        {
-            let zoom_level_tiles = TileCoord::get_zoom_level_tiles(uzoom);
+        let mut stack: Vec<TileNeighbor> = vec![];
+        tile_neighbors(center_tile, &mut stack);
 
-            for dx in 0..(zoom_level_tiles / 2) {
-                let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x + dx, center_tile.y), &mut tiles);
-                if !v {
-                    break;
-                }
-            }
-            for dx in 1..(1 + zoom_level_tiles / 2) {
-                let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x - dx, center_tile.y), &mut tiles);
-                if !v {
-                    break;
-                }
-            }
+        let mut visited: HashSet<TileNeighbor> = HashSet::new();
+        visited.insert(TileNeighbor::Coord(center_tile));
+        visited.extend(stack.iter());
 
-            // move south
-            for y in (center_tile.y + 1)..zoom_level_tiles {
-                let mut visible = false;
+        let mut neighbors = vec![];
 
-                for dx in 0..(zoom_level_tiles / 2) {
-                    let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x + dx, y), &mut tiles);
-                    visible = visible || v;
-                    if !v {
-                        break;
-                    }
+        loop {
+            if let Some(tn) = stack.pop() {
+                match tn {
+                    TileNeighbor::Coord(tc) => {
+                        if tile_is_visible(tc) {
+                            tiles.push(tc);
+                            tile_neighbors(tc, &mut neighbors);
+                            for tn in &neighbors {
+                                if !visited.contains(tn) {
+                                    visited.insert(*tn);
+                                    stack.push(*tn);
+                                }
+                            }
+                        }
+                    },
+                    _ => {},
                 }
-                for dx in 1..(1 + zoom_level_tiles / 2) {
-                    let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x - dx, y), &mut tiles);
-                    visible = visible || v;
-                    if !v {
-                        break;
-                    }
-                }
-
-                if !visible {
-                    break;
-                }
-            }
-
-            // move north
-            for y in (0..center_tile.y).rev() {
-                let mut visible = false;
-
-                for dx in 0..(zoom_level_tiles / 2) {
-                    let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x + dx, y), &mut tiles);
-                    visible = visible || v;
-                    if !v {
-                        break;
-                    }
-                }
-                for dx in 1..(1 + zoom_level_tiles / 2) {
-                    let v = add_tile_if_visible(TileCoord::new(uzoom, center_tile.x - dx, y), &mut tiles);
-                    visible = visible || v;
-                    if !v {
-                        break;
-                    }
-                }
-
-                if !visible {
-                    break;
-                }
+            } else {
+                break;
             }
         }
 
