@@ -5,7 +5,7 @@ use coord::View;
 use map_view::MapView;
 use mercator_view::MercatorView;
 use program::Program;
-use tile_atlas::TileAtlas;
+use tile_atlas::{TileAtlas, VisibleTilesProvider};
 use tile_cache::TileCache;
 use tile_source::TileSource;
 use vertex_attrib::VertexAttribParams;

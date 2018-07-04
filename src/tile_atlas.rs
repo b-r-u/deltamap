@@ -2,7 +2,7 @@ use context::Context;
 use coord::{ScreenRect, SubTileCoord, TileCoord, TextureRect};
 use image;
 use linked_hash_map::LinkedHashMap;
-use mercator_view::VisibleTile;
+use mercator_view;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use texture::Texture;
@@ -91,7 +91,14 @@ impl TileAtlas {
         CacheSlot { x: 0, y: 0 }
     }
 
-    pub fn store(&mut self, cx: &mut Context, tile_coord: TileCoord, source: &TileSource, cache: &mut TileCache, load: bool) -> Option<CacheSlot> {
+    pub fn store(
+        &mut self,
+        cx: &mut Context,
+        tile_coord: TileCoord,
+        source: &TileSource,
+        cache: &mut TileCache,
+        load: bool
+    ) -> Option<CacheSlot> {
         let mut remove_tile = None;
         let tile = Tile::new(tile_coord, source.id());
 
@@ -146,19 +153,68 @@ impl TileAtlas {
          0.5 / f64::from(self.texture.height()))
     }
 
+    pub fn slot_to_texture_rect(&self, slot: CacheSlot) -> TextureRect {
+        let scale_x = f64::from(self.tile_size) / f64::from(self.texture.width());
+        let scale_y = f64::from(self.tile_size) / f64::from(self.texture.height());
+
+        TextureRect {
+            x1: f64::from(slot.x) * scale_x,
+            y1: f64::from(slot.y) * scale_y,
+            x2: f64::from(slot.x + 1) * scale_x,
+            y2: f64::from(slot.y + 1) * scale_y,
+        }
+    }
+
+    fn subslot_to_texture_rect(&self, slot: CacheSlot, sub_coord: SubTileCoord) -> TextureRect {
+        let scale_x = f64::from(self.tile_size) / (f64::from(self.texture.width()) *
+                                                   f64::from(sub_coord.size));
+        let scale_y = f64::from(self.tile_size) / (f64::from(self.texture.height()) *
+                                                   f64::from(sub_coord.size));
+
+        TextureRect {
+            x1: f64::from(slot.x * sub_coord.size + sub_coord.x) * scale_x,
+            y1: f64::from(slot.y * sub_coord.size + sub_coord.y) * scale_y,
+            x2: f64::from(slot.x * sub_coord.size + sub_coord.x + 1) * scale_x,
+            y2: f64::from(slot.y * sub_coord.size + sub_coord.y + 1) * scale_y,
+        }
+    }
+
+    pub fn texture(&self) -> &Texture {
+        &self.texture
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CacheSlot {
+    pub x: u32,
+    pub y: u32,
+}
+
+pub trait VisibleTilesProvider<T> {
     /// Finds textures from the cache for a given slice of visible tiles. The texture atlas may not
-    /// be big enough to hold all textures at once; a possible remainder of untextured visible tiles is
-    /// returned as an `Option`.
-    /// The function guarantees that no more than `max_tiles_to_use` tiles are used for texturing;
+    /// be big enough to hold all textures at once; a possible remainder of untextured visible
+    /// tiles is returned as an `Option`.
+    /// The function should guarantee that no more than `max_tiles_to_use` tiles are used for texturing;
     /// the number of used tiles is returned as an `usize`.
-    pub fn textured_visible_tiles<'b>(
+    fn textured_visible_tiles<'b>(
         &mut self,
         cx: &mut Context,
-        visible_tiles: &'b [VisibleTile],
+        visible_tiles: &'b [T],
         max_tiles_to_use: usize,
         source: &TileSource,
         cache: &mut TileCache,
-        ) -> (Vec<TexturedVisibleTile>, Option<&'b [VisibleTile]>, usize)
+    ) -> (Vec<TexturedVisibleTile>, Option<&'b [T]>, usize);
+}
+
+impl VisibleTilesProvider<mercator_view::VisibleTile> for TileAtlas {
+    fn textured_visible_tiles<'b>(
+        &mut self,
+        cx: &mut Context,
+        visible_tiles: &'b [mercator_view::VisibleTile],
+        max_tiles_to_use: usize,
+        source: &TileSource,
+        cache: &mut TileCache,
+        ) -> (Vec<TexturedVisibleTile>, Option<&'b [mercator_view::VisibleTile]>, usize)
     {
         let mut tvt = Vec::with_capacity(visible_tiles.len());
 
@@ -210,7 +266,9 @@ impl TileAtlas {
                 }
 
                 // look for cached tiles in higher zoom layers
-                for &(child_tile, child_sub_coord) in &vt.tile.children() {
+                //TODO Just create one rect (instead of four) if there is no tile from a higher
+                // zoom level available
+                for (child_tile, child_sub_coord) in vt.tile.children_iter(1) {
                     if let Some(slot) = self.store(cx, child_tile, source, cache, false) {
                         used_slots += 1;
                         let tex_rect = self.slot_to_texture_rect(slot);
@@ -237,38 +295,4 @@ impl TileAtlas {
 
         (tvt, None, used_slots)
     }
-
-    pub fn slot_to_texture_rect(&self, slot: CacheSlot) -> TextureRect {
-        let scale_x = f64::from(self.tile_size) / f64::from(self.texture.width());
-        let scale_y = f64::from(self.tile_size) / f64::from(self.texture.height());
-
-        TextureRect {
-            x1: f64::from(slot.x) * scale_x,
-            y1: f64::from(slot.y) * scale_y,
-            x2: f64::from(slot.x + 1) * scale_x,
-            y2: f64::from(slot.y + 1) * scale_y,
-        }
-    }
-
-    fn subslot_to_texture_rect(&self, slot: CacheSlot, sub_coord: SubTileCoord) -> TextureRect {
-        let scale_x = f64::from(self.tile_size) / (f64::from(self.texture.width()) * f64::from(sub_coord.size));
-        let scale_y = f64::from(self.tile_size) / (f64::from(self.texture.height()) * f64::from(sub_coord.size));
-
-        TextureRect {
-            x1: f64::from(slot.x * sub_coord.size + sub_coord.x) * scale_x,
-            y1: f64::from(slot.y * sub_coord.size + sub_coord.y) * scale_y,
-            x2: f64::from(slot.x * sub_coord.size + sub_coord.x + 1) * scale_x,
-            y2: f64::from(slot.y * sub_coord.size + sub_coord.y + 1) * scale_y,
-        }
-    }
-
-    pub fn texture(&self) -> &Texture {
-        &self.texture
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct CacheSlot {
-    pub x: u32,
-    pub y: u32,
 }
