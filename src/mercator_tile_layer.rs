@@ -12,17 +12,17 @@ use vertex_attrib::VertexAttribParams;
 
 
 #[derive(Debug)]
-pub struct TileLayer {
+pub struct MercatorTileLayer {
     program: Program,
     buffer: Buffer,
 }
 
 
-impl TileLayer {
+impl MercatorTileLayer {
     pub fn new(
         cx: &mut Context,
         atlas: &TileAtlas,
-    ) -> TileLayer
+    ) -> MercatorTileLayer
     {
         let buffer = Buffer::new(cx, &[], 0);
         check_gl_errors!(cx);
@@ -55,7 +55,7 @@ impl TileLayer {
         );
         check_gl_errors!(cx);
 
-        TileLayer {
+        MercatorTileLayer {
             program,
             buffer,
         }

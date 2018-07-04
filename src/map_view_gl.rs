@@ -8,7 +8,7 @@ use session::Session;
 use texture::{Texture, TextureFormat};
 use tile_atlas::TileAtlas;
 use tile_cache::TileCache;
-use tile_layer::TileLayer;
+use mercator_tile_layer::MercatorTileLayer;
 use tile_source::TileSource;
 
 
@@ -23,7 +23,7 @@ pub struct MapViewGl {
     dpi_factor: f64,
     tile_cache: TileCache,
     tile_atlas: TileAtlas,
-    tile_layer: TileLayer,
+    mercator_tile_layer: MercatorTileLayer,
     marker_layer: MarkerLayer,
     ortho_tile_layer: OrthoTileLayer,
     projection: Projection,
@@ -59,7 +59,11 @@ impl MapViewGl {
     {
         let tile_size = 256;
 
-        let mut map_view = MercatorView::initial_map_view(f64::from(initial_size.0), f64::from(initial_size.1), tile_size);
+        let mut map_view = MercatorView::initial_map_view(
+            f64::from(initial_size.0),
+            f64::from(initial_size.1),
+            tile_size,
+        );
 
         if map_view.zoom < MIN_ZOOM_LEVEL {
             map_view.zoom = MIN_ZOOM_LEVEL;
@@ -88,7 +92,7 @@ impl MapViewGl {
         tile_atlas.double_texture_size(cx);
         tile_atlas.double_texture_size(cx);
 
-        let tile_layer = TileLayer::new(cx, &tile_atlas);
+        let mercator_tile_layer = MercatorTileLayer::new(cx, &tile_atlas);
 
         MapViewGl {
             map_view,
@@ -96,7 +100,7 @@ impl MapViewGl {
             dpi_factor,
             tile_cache: TileCache::new(move |_tile| update_func(), use_network),
             tile_atlas,
-            tile_layer,
+            mercator_tile_layer,
             marker_layer: MarkerLayer::new(cx),
             ortho_tile_layer: OrthoTileLayer::new(cx),
             projection: Projection::Mercator,
@@ -138,16 +142,16 @@ impl MapViewGl {
         };
     }
 
-    fn draw_flat_tiles(&mut self, cx: &mut Context, source: &TileSource, snap_to_pixel: bool)
+    fn draw_mercator_tiles(&mut self, cx: &mut Context, source: &TileSource, snap_to_pixel: bool)
         -> Result<usize, usize>
     {
         if self.last_draw_type != DrawType::Tiles {
             self.last_draw_type = DrawType::Tiles;
-            self.tile_layer.prepare_draw(cx, &self.tile_atlas);
+            self.mercator_tile_layer.prepare_draw(cx, &self.tile_atlas);
         }
 
         //TODO remove viewport_size parameter
-        self.tile_layer.draw(
+        self.mercator_tile_layer.draw(
             cx,
             &self.map_view,
             source,
@@ -198,7 +202,7 @@ impl MapViewGl {
 
         match self.projection {
             Projection::Mercator => {
-                let ret = self.draw_flat_tiles(cx, source, snap_to_pixel);
+                let ret = self.draw_mercator_tiles(cx, source, snap_to_pixel);
                 if !self.marker_layer.is_empty() {
                     self.draw_marker(cx, snap_to_pixel);
                 }
