@@ -1,9 +1,30 @@
 use cgmath::{Matrix3, Point3, Transform, vec3};
-use coord::{LatLonRad, TileCoord};
+use coord::{LatLonRad, TextureRect, TileCoord};
 use map_view::MapView;
 use std::collections::HashSet;
 use std::f32::consts::{PI, FRAC_1_PI};
 use std::f64;
+
+
+#[derive(Clone, Debug)]
+pub struct VisibleTile {
+    pub tile: TileCoord,
+}
+
+impl From<TileCoord> for VisibleTile {
+    fn from(tc: TileCoord) -> Self {
+        VisibleTile {
+            tile: tc,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TexturedVisibleTile {
+    pub tile_coord: TileCoord,
+    pub tex_rect: TextureRect,
+    pub tex_minmax: TextureRect,
+}
 
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -118,18 +139,18 @@ impl OrthograficView {
 
     //TODO Return the transformation matrix that is used here to avoid redundant calculation.
     /// Returns a `Vec` of all tiles that are visible in the current viewport.
-    pub fn visible_tiles(map_view: &MapView) -> Vec<TileCoord> {
+    pub fn visible_tiles(map_view: &MapView) -> Vec<VisibleTile> {
         let uzoom = Self::tile_zoom(map_view);
 
         match uzoom {
-            0 => return vec![TileCoord::new(0, 0, 0)],
+            0 => return vec![TileCoord::new(0, 0, 0).into()],
             1 => {
                 // return every tile
                 return vec![
-                    TileCoord::new(1, 0, 0),
-                    TileCoord::new(1, 0, 1),
-                    TileCoord::new(1, 1, 0),
-                    TileCoord::new(1, 1, 1),
+                    TileCoord::new(1, 0, 0).into(),
+                    TileCoord::new(1, 0, 1).into(),
+                    TileCoord::new(1, 1, 0).into(),
+                    TileCoord::new(1, 1, 1).into(),
                 ]},
             _ => {},
         }
@@ -160,7 +181,7 @@ impl OrthograficView {
             }
         };
 
-        let mut tiles = vec![center_tile];
+        let mut tiles = vec![center_tile.into()];
 
         let mut stack: Vec<TileNeighbor> = vec![];
         tile_neighbors(center_tile, &mut stack);
@@ -169,14 +190,14 @@ impl OrthograficView {
         visited.insert(TileNeighbor::Coord(center_tile));
         visited.extend(stack.iter());
 
-        let mut neighbors = vec![];
+        let mut neighbors = Vec::with_capacity(4);
 
         loop {
             if let Some(tn) = stack.pop() {
                 match tn {
                     TileNeighbor::Coord(tc) => {
                         if tile_is_visible(tc) {
-                            tiles.push(tc);
+                            tiles.push(tc.into());
                             tile_neighbors(tc, &mut neighbors);
                             for tn in &neighbors {
                                 if !visited.contains(tn) {

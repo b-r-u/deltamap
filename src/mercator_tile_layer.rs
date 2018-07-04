@@ -33,10 +33,8 @@ impl MercatorTileLayer {
             include_bytes!("../shader/map.vert"),
             include_bytes!("../shader/map.frag"),
         ).unwrap();
-        check_gl_errors!(cx);
 
         program.add_texture(cx, atlas.texture(), CStr::from_bytes_with_nul(b"tex_map\0").unwrap());
-        check_gl_errors!(cx);
 
         program.add_attribute(
             cx,
@@ -53,6 +51,7 @@ impl MercatorTileLayer {
             CStr::from_bytes_with_nul(b"tex_minmax\0").unwrap(),
             &VertexAttribParams::new(4, 8, 4)
         );
+
         check_gl_errors!(cx);
 
         MercatorTileLayer {
@@ -100,7 +99,7 @@ impl MercatorTileLayer {
                 )
             };
 
-            max_tiles_to_use -= used_tiles;
+            max_tiles_to_use = max_tiles_to_use.saturating_sub(used_tiles);
 
             let mut vertex_data: Vec<f32> = Vec::with_capacity(textured_visible_tiles.len() * (6 * 8));
             let scale_x = 2.0 / f64::from(viewport_size.0);

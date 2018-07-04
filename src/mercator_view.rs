@@ -1,4 +1,4 @@
-use coord::{MapCoord, ScreenCoord, ScreenRect, TileCoord};
+use coord::{MapCoord, ScreenCoord, ScreenRect, TextureRect, TileCoord};
 use map_view::MapView;
 
 
@@ -13,6 +13,14 @@ pub struct VisibleTile {
     pub tile: TileCoord,
     pub rect: ScreenRect,
 }
+
+#[derive(Clone, Debug)]
+pub struct TexturedVisibleTile {
+    pub screen_rect: ScreenRect,
+    pub tex_rect: TextureRect,
+    pub tex_minmax: TextureRect,
+}
+
 
 impl MercatorView {
     /// Constructs a `MapView` centered at Null Island with an integer zoom that fills a screen

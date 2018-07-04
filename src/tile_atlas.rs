@@ -1,8 +1,9 @@
 use context::Context;
-use coord::{ScreenRect, SubTileCoord, TileCoord, TextureRect};
+use coord::{SubTileCoord, TileCoord, TextureRect};
 use image;
 use linked_hash_map::LinkedHashMap;
 use mercator_view;
+use orthografic_view;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use texture::Texture;
@@ -10,12 +11,6 @@ use tile::Tile;
 use tile_cache::TileCache;
 use tile_source::TileSource;
 
-#[derive(Clone, Debug)]
-pub struct TexturedVisibleTile {
-    pub screen_rect: ScreenRect,
-    pub tex_rect: TextureRect,
-    pub tex_minmax: TextureRect,
-}
 
 #[derive(Clone, Debug)]
 pub struct TileAtlas {
@@ -190,7 +185,9 @@ pub struct CacheSlot {
     pub y: u32,
 }
 
-pub trait VisibleTilesProvider<T> {
+/// U: Untextured Visible tile type
+/// T: Textured visible tile type
+pub trait VisibleTilesProvider<U, T> {
     /// Finds textures from the cache for a given slice of visible tiles. The texture atlas may not
     /// be big enough to hold all textures at once; a possible remainder of untextured visible
     /// tiles is returned as an `Option`.
@@ -199,14 +196,15 @@ pub trait VisibleTilesProvider<T> {
     fn textured_visible_tiles<'b>(
         &mut self,
         cx: &mut Context,
-        visible_tiles: &'b [T],
+        visible_tiles: &'b [U],
         max_tiles_to_use: usize,
         source: &TileSource,
         cache: &mut TileCache,
-    ) -> (Vec<TexturedVisibleTile>, Option<&'b [T]>, usize);
+    ) -> (Vec<T>, Option<&'b [U]>, usize);
 }
 
-impl VisibleTilesProvider<mercator_view::VisibleTile> for TileAtlas {
+impl VisibleTilesProvider<mercator_view::VisibleTile, mercator_view::TexturedVisibleTile>
+for TileAtlas {
     fn textured_visible_tiles<'b>(
         &mut self,
         cx: &mut Context,
@@ -214,7 +212,7 @@ impl VisibleTilesProvider<mercator_view::VisibleTile> for TileAtlas {
         max_tiles_to_use: usize,
         source: &TileSource,
         cache: &mut TileCache,
-        ) -> (Vec<TexturedVisibleTile>, Option<&'b [mercator_view::VisibleTile]>, usize)
+    ) -> (Vec<mercator_view::TexturedVisibleTile>, Option<&'b [mercator_view::VisibleTile]>, usize)
     {
         let mut tvt = Vec::with_capacity(visible_tiles.len());
 
@@ -234,7 +232,7 @@ impl VisibleTilesProvider<mercator_view::VisibleTile> for TileAtlas {
                 let tex_rect = self.slot_to_texture_rect(slot);
                 used_slots += 1;
                 tvt.push(
-                    TexturedVisibleTile {
+                    mercator_view::TexturedVisibleTile {
                         screen_rect: vt.rect,
                         tex_rect,
                         tex_minmax: tex_rect.inset(inset_x, inset_y),
@@ -274,7 +272,7 @@ impl VisibleTilesProvider<mercator_view::VisibleTile> for TileAtlas {
                         let tex_rect = self.slot_to_texture_rect(slot);
 
                         tvt.push(
-                            TexturedVisibleTile {
+                            mercator_view::TexturedVisibleTile {
                                 screen_rect: vt.rect.subdivide(&child_sub_coord),
                                 tex_rect,
                                 tex_minmax: tex_rect.inset(inset_x, inset_y),
@@ -282,8 +280,101 @@ impl VisibleTilesProvider<mercator_view::VisibleTile> for TileAtlas {
                         );
                     } else {
                         tvt.push(
-                            TexturedVisibleTile {
+                            mercator_view::TexturedVisibleTile {
                                 screen_rect: vt.rect.subdivide(&child_sub_coord),
+                                tex_rect: tex_sub_rect.subdivide(&child_sub_coord),
+                                tex_minmax: tex_rect.inset(inset_x, inset_y),
+                            }
+                        );
+                    }
+                }
+            };
+        }
+
+        (tvt, None, used_slots)
+    }
+}
+
+impl VisibleTilesProvider<orthografic_view::VisibleTile, orthografic_view::TexturedVisibleTile>
+for TileAtlas {
+    fn textured_visible_tiles<'b>(
+        &mut self,
+        cx: &mut Context,
+        visible_tiles: &'b [orthografic_view::VisibleTile],
+        max_tiles_to_use: usize,
+        source: &TileSource,
+        cache: &mut TileCache,
+    ) -> (Vec<orthografic_view::TexturedVisibleTile>, Option<&'b [orthografic_view::VisibleTile]>,
+          usize)
+    {
+        let mut tvt = Vec::with_capacity(visible_tiles.len());
+
+        let (inset_x, inset_y) = self.texture_margins();
+
+        let num_usable_slots = self.slots_lru.len();
+        // The number of actually used slots may be lower, because slots can be used multiple times
+        // in the same view (especially the default slot).
+        let mut used_slots = 0_usize;
+
+        for (i, vt) in visible_tiles.iter().enumerate() {
+            if used_slots >= num_usable_slots || used_slots >= max_tiles_to_use {
+                return (tvt, Some(&visible_tiles[i..]), used_slots);
+            }
+
+            if let Some(slot) = self.store(cx, vt.tile, source, cache, true) {
+                let tex_rect = self.slot_to_texture_rect(slot);
+                used_slots += 1;
+                tvt.push(
+                    orthografic_view::TexturedVisibleTile {
+                        tile_coord: vt.tile,
+                        tex_rect,
+                        tex_minmax: tex_rect.inset(inset_x, inset_y),
+                    }
+                );
+            } else {
+                // exact tile not found
+
+                if used_slots + 5 > num_usable_slots || used_slots + 5 > max_tiles_to_use {
+                    return (tvt, Some(&visible_tiles[i..]), used_slots);
+                }
+
+                // default tile
+                let mut tex_sub_rect = self.slot_to_texture_rect(Self::default_slot());
+                let mut tex_rect = tex_sub_rect;
+
+                // look for cached tiles in lower zoom layers
+                for dist in 1..31 {
+                    if let Some((parent_tile, sub_coord)) = vt.tile.parent(dist) {
+                        if let Some(slot) = self.store(cx, parent_tile, source, cache, false) {
+                            used_slots += 1;
+                            tex_sub_rect = self.subslot_to_texture_rect(slot, sub_coord);
+                            tex_rect = self.slot_to_texture_rect(slot);
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                // look for cached tiles in higher zoom layers
+                //TODO Just create one rect (instead of four) if there is no tile from a higher
+                // zoom level available
+                for (child_tile, child_sub_coord) in vt.tile.children_iter(1) {
+                    if let Some(slot) = self.store(cx, child_tile, source, cache, false) {
+                        used_slots += 1;
+                        let tex_rect = self.slot_to_texture_rect(slot);
+
+                        tvt.push(
+                            orthografic_view::TexturedVisibleTile {
+                                tile_coord: child_tile,
+                                tex_rect,
+                                tex_minmax: tex_rect.inset(inset_x, inset_y),
+                            }
+                        );
+                    } else {
+                        tvt.push(
+                            orthografic_view::TexturedVisibleTile {
+                                tile_coord: child_tile,
                                 tex_rect: tex_sub_rect.subdivide(&child_sub_coord),
                                 tex_minmax: tex_rect.inset(inset_x, inset_y),
                             }

@@ -86,13 +86,10 @@ impl MapViewGl {
         let atlas_tex = Texture::empty(cx, atlas_size, atlas_size, TextureFormat::Rgb8);
         check_gl_errors!(cx);
 
-        let mut tile_atlas = TileAtlas::new(cx, atlas_tex, tile_size, use_async);
-        //TODO remove this
-        tile_atlas.double_texture_size(cx);
-        tile_atlas.double_texture_size(cx);
-        tile_atlas.double_texture_size(cx);
+        let tile_atlas = TileAtlas::new(cx, atlas_tex, tile_size, use_async);
 
         let mercator_tile_layer = MercatorTileLayer::new(cx, &tile_atlas);
+        let ortho_tile_layer = OrthoTileLayer::new(cx, &tile_atlas);
 
         MapViewGl {
             map_view,
@@ -102,7 +99,7 @@ impl MapViewGl {
             tile_atlas,
             mercator_tile_layer,
             marker_layer: MarkerLayer::new(cx),
-            ortho_tile_layer: OrthoTileLayer::new(cx),
+            ortho_tile_layer,
             projection: Projection::Mercator,
             last_draw_type: DrawType::Null,
         }
@@ -178,7 +175,7 @@ impl MapViewGl {
         );
     }
 
-    fn draw_ortho_tiles(&mut self, cx: &mut Context, source: &TileSource) {
+    fn draw_ortho_tiles(&mut self, cx: &mut Context, source: &TileSource) -> Result<usize, usize> {
         if self.last_draw_type != DrawType::OrthoTiles {
             self.last_draw_type = DrawType::OrthoTiles;
             self.ortho_tile_layer.prepare_draw(cx, &self.tile_atlas);
@@ -190,7 +187,7 @@ impl MapViewGl {
             source,
             &mut self.tile_cache,
             &mut self.tile_atlas,
-        );
+        )
     }
 
     /// Returns `Err` when tile cache is too small for this view.
@@ -209,8 +206,7 @@ impl MapViewGl {
                 ret
             },
             Projection::Orthografic => {
-                self.draw_ortho_tiles(cx, source);
-                Ok(1)
+                self.draw_ortho_tiles(cx, source)
             },
         }
     }
