@@ -29,6 +29,10 @@ impl BufferId {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum DrawMode {
+    Points,
+    Lines,
+    LineStrip,
+    LineLoop,
     Triangles,
     TriangleStrip,
     TriangleFan,
@@ -37,6 +41,10 @@ pub enum DrawMode {
 impl DrawMode {
     pub fn to_gl_enum(self) -> u32 {
         match self {
+            DrawMode::Points => context::gl::POINTS,
+            DrawMode::Lines => context::gl::LINES,
+            DrawMode::LineStrip => context::gl::LINE_STRIP,
+            DrawMode::LineLoop => context::gl::LINE_LOOP,
             DrawMode::Triangles => context::gl::TRIANGLES,
             DrawMode::TriangleStrip => context::gl::TRIANGLE_STRIP,
             DrawMode::TriangleFan => context::gl::TRIANGLE_FAN,
