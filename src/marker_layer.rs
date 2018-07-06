@@ -2,10 +2,11 @@ use ::std::ffi::CStr;
 use buffer::{Buffer, DrawMode};
 use cgmath::{Matrix3, Point2, Transform, vec2, vec3};
 use context::Context;
-use coord::{MapCoord, ScreenRect};
+use coord::{MapCoord, ScreenCoord, ScreenRect};
 use image;
 use map_view::MapView;
 use mercator_view::MercatorView;
+use orthografic_view::OrthograficView;
 use program::Program;
 use texture::Texture;
 use vertex_attrib::VertexAttribParams;
@@ -127,6 +128,94 @@ impl MarkerLayer {
                     sp.y += snapped.y - topleft.y;
                 }
                 sp
+            };
+
+            if !screen_pos.is_inside(&visible_rect) {
+                continue;
+            }
+            let trans_mat: Matrix3<f32> = Matrix3::from_cols(
+                vec3(0.0, 0.0, 0.0),
+                vec3(0.0, 0.0, 0.0),
+                vec3(screen_pos.x as f32, screen_pos.y as f32, 0.0),
+            );
+            let mat: Matrix3<f32> = screen_mat * (tex_mat + trans_mat);
+
+            let p1: Point2<f32> = mat.transform_point(t1);
+            let p2: Point2<f32> = mat.transform_point(t2);
+            let p3: Point2<f32> = mat.transform_point(t3);
+            let p4: Point2<f32> = mat.transform_point(t4);
+
+            vertex_data.extend::<&[f32; 2]>(p1.as_ref());
+            vertex_data.extend::<&[f32; 2]>(t1.as_ref());
+            vertex_data.extend::<&[f32; 2]>(p2.as_ref());
+            vertex_data.extend::<&[f32; 2]>(t2.as_ref());
+            vertex_data.extend::<&[f32; 2]>(p3.as_ref());
+            vertex_data.extend::<&[f32; 2]>(t3.as_ref());
+            vertex_data.extend::<&[f32; 2]>(p1.as_ref());
+            vertex_data.extend::<&[f32; 2]>(t1.as_ref());
+            vertex_data.extend::<&[f32; 2]>(p3.as_ref());
+            vertex_data.extend::<&[f32; 2]>(t3.as_ref());
+            vertex_data.extend::<&[f32; 2]>(p4.as_ref());
+            vertex_data.extend::<&[f32; 2]>(t4.as_ref());
+        }
+
+        self.buffer.set_data(cx, &vertex_data, vertex_data.len() / 4);
+        self.buffer.draw(cx, &self.program, DrawMode::Triangles);
+    }
+
+
+    pub fn draw_ortho(
+        &mut self,
+        cx: &mut Context,
+        map_view: &MapView,
+        dpi_factor: f64,
+    ) {
+        let mut vertex_data: Vec<f32> = vec![];
+
+        let marker_size = vec2::<f64>(40.0, 50.0) * dpi_factor;
+        let marker_offset = vec2::<f64>(-20.0, -50.0) * dpi_factor;
+
+        let scale_x = 2.0 / map_view.width as f32;
+        let scale_y = -2.0 / map_view.height as f32;
+
+        let tex_mat: Matrix3<f32> = Matrix3::from_cols(
+            vec3(marker_size.x as f32, 0.0, 0.0),
+            vec3(0.0, marker_size.y as f32, 0.0),
+            vec3(marker_offset.x as f32, marker_offset.y as f32, 1.0),
+        );
+
+        let screen_mat: Matrix3<f32> = Matrix3::from_cols(
+            vec3(scale_x, 0.0, 0.0),
+            vec3(0.0, scale_y, 0.0),
+            vec3(-1.0, 1.0, 1.0),
+        );
+
+        let t1 = Point2::new(0.0f32, 0.0);
+        let t2 = Point2::new(1.0f32, 0.0);
+        let t3 = Point2::new(1.0f32, 1.0);
+        let t4 = Point2::new(0.0f32, 1.0);
+
+        let visible_rect = ScreenRect {
+            x: -(marker_offset.x + marker_size.x),
+            y: -(marker_offset.y + marker_size.y),
+            width: map_view.width + marker_size.x,
+            height: map_view.height + marker_size.y,
+        };
+
+        let transform = OrthograficView::transformation_matrix(map_view);
+
+        for map_pos in &self.positions {
+            let screen_pos = {
+                let norm_pos = transform.transform_point(map_pos.to_latlon_rad().to_sphere_point3());
+
+                if norm_pos.z > 0.0 {
+                    continue;
+                }
+
+                ScreenCoord::new(
+                    (norm_pos.x + 1.0) * (0.5 * map_view.width),
+                    (-norm_pos.y + 1.0) * (0.5 * map_view.height),
+                )
             };
 
             if !screen_pos.is_inside(&visible_rect) {

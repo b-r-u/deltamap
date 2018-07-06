@@ -164,6 +164,19 @@ impl MapViewGl {
         );
     }
 
+    fn draw_ortho_marker(&mut self, cx: &mut Context) {
+        if self.last_draw_type != DrawType::Markers {
+            self.last_draw_type = DrawType::Markers;
+            self.marker_layer.prepare_draw(cx);
+        }
+
+        self.marker_layer.draw_ortho(
+            cx,
+            &self.map_view,
+            self.dpi_factor,
+        );
+    }
+
     fn draw_ortho_tiles(&mut self, cx: &mut Context, source: &TileSource) -> Result<usize, usize> {
         if self.last_draw_type != DrawType::OrthoTiles {
             self.last_draw_type = DrawType::OrthoTiles;
@@ -195,7 +208,11 @@ impl MapViewGl {
                 ret
             },
             Projection::Orthografic => {
-                self.draw_ortho_tiles(cx, source)
+                let ret = self.draw_ortho_tiles(cx, source);
+                if !self.marker_layer.is_empty() {
+                    self.draw_ortho_marker(cx);
+                }
+                ret
             },
         }
     }
