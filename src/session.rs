@@ -1,10 +1,11 @@
 use coord::MapCoord;
+use projection::Projection;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use toml;
 use toml::Value;
 use toml::value::Table;
+use toml;
 
 
 #[derive(Debug)]
@@ -12,6 +13,7 @@ pub struct Session {
     pub view_center: MapCoord,
     pub zoom: f64,
     pub tile_source: Option<String>,
+    pub projection: Projection,
 }
 
 impl Session {
@@ -61,11 +63,20 @@ impl Session {
                     None => None,
                 };
 
+                let projection = match view.get("projection") {
+                    Some(&Value::String(ref s)) => {
+                        Projection::from_str(s).unwrap_or_else(|| Projection::Mercator)
+                    },
+                    Some(_) => return Err("projection has to be a string.".to_string()),
+                    None => Projection::Mercator,
+                };
+
                 Ok(
                     Session {
                         view_center: MapCoord::new(x, y),
                         zoom,
                         tile_source,
+                        projection,
                     }
                 )
             },
@@ -82,6 +93,7 @@ impl Session {
         if let Some(ref tile_source) = self.tile_source {
             view.insert("tile_source".to_string(), Value::String(tile_source.clone()));
         }
+        view.insert("projection".to_string(), Value::String(self.projection.to_str().to_string()));
 
         let mut root = Table::new();
         root.insert("view".to_string(), Value::Table(view));

@@ -1,14 +1,15 @@
 use context::Context;
 use coord::{MapCoord, ScreenCoord};
-use ortho_tile_layer::OrthoTileLayer;
 use map_view::MapView;
 use marker_layer::MarkerLayer;
+use mercator_tile_layer::MercatorTileLayer;
 use mercator_view::MercatorView;
+use ortho_tile_layer::OrthoTileLayer;
+use projection::Projection;
 use session::Session;
 use texture::{Texture, TextureFormat};
 use tile_atlas::TileAtlas;
 use tile_cache::TileCache;
-use mercator_tile_layer::MercatorTileLayer;
 use tile_source::TileSource;
 
 
@@ -28,14 +29,6 @@ pub struct MapViewGl {
     ortho_tile_layer: OrthoTileLayer,
     projection: Projection,
     last_draw_type: DrawType,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-enum Projection {
-    // EPSG:3857: WGS 84 / Pseudo-Mercator
-    Mercator,
-    // Orthographic projection, WGS 84 coordinates mapped to the sphere
-    Orthografic,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -262,6 +255,7 @@ impl MapViewGl {
         self.map_view.center = session.view_center;
         self.map_view.center.normalize_xy();
         self.map_view.zoom = MIN_ZOOM_LEVEL.max(MAX_ZOOM_LEVEL.min(session.zoom));
+        self.projection = session.projection;
     }
 
     pub fn to_session(&self) -> Session {
@@ -269,6 +263,7 @@ impl MapViewGl {
             view_center: self.map_view.center,
             zoom: self.map_view.zoom,
             tile_source: None,
+            projection: self.projection,
         }
     }
 }

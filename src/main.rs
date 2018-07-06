@@ -31,6 +31,7 @@ pub mod mercator_view;
 pub mod ortho_tile_layer;
 pub mod orthografic_view;
 pub mod program;
+pub mod projection;
 pub mod search;
 pub mod session;
 pub mod texture;
@@ -43,8 +44,8 @@ pub mod url_template;
 pub mod vertex_attrib;
 
 use coord::{LatLonDeg, ScreenCoord};
-use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use glutin::dpi::{LogicalPosition, LogicalSize, PhysicalPosition};
+use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
 use std::error::Error;
 use std::sync::mpsc;
