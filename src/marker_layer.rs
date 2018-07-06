@@ -76,11 +76,10 @@ impl MarkerLayer {
         self.program.set_vertex_attribs(cx, &self.buffer);
     }
 
-    pub fn draw(
+    pub fn draw_mercator(
         &mut self,
         cx: &mut Context,
         map_view: &MapView,
-        viewport_size: (u32, u32),
         dpi_factor: f64,
         snap_to_pixel: bool
     ) {
@@ -89,8 +88,8 @@ impl MarkerLayer {
         let marker_size = vec2::<f64>(40.0, 50.0) * dpi_factor;
         let marker_offset = vec2::<f64>(-20.0, -50.0) * dpi_factor;
 
-        let scale_x = 2.0 / viewport_size.0 as f32;
-        let scale_y = -2.0 / viewport_size.1 as f32;
+        let scale_x = 2.0 / map_view.width as f32;
+        let scale_y = -2.0 / map_view.height as f32;
 
         let tex_mat: Matrix3<f32> = Matrix3::from_cols(
             vec3(marker_size.x as f32, 0.0, 0.0),
@@ -112,8 +111,8 @@ impl MarkerLayer {
         let visible_rect = ScreenRect {
             x: -(marker_offset.x + marker_size.x),
             y: -(marker_offset.y + marker_size.y),
-            width: f64::from(viewport_size.0) + marker_size.x,
-            height: f64::from(viewport_size.1) + marker_size.y,
+            width: map_view.width + marker_size.x,
+            height: map_view.height + marker_size.y,
         };
 
         for map_pos in &self.positions {

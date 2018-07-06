@@ -74,7 +74,6 @@ impl MercatorTileLayer {
         source: &TileSource,
         cache: &mut TileCache,
         atlas: &mut TileAtlas,
-        viewport_size: (u32, u32),
         snap_to_pixel: bool
     ) -> Result<usize, usize> {
         cache.set_view_location(View {
@@ -102,8 +101,8 @@ impl MercatorTileLayer {
             max_tiles_to_use = max_tiles_to_use.saturating_sub(used_tiles);
 
             let mut vertex_data: Vec<f32> = Vec::with_capacity(textured_visible_tiles.len() * (6 * 8));
-            let scale_x = 2.0 / f64::from(viewport_size.0);
-            let scale_y = -2.0 / f64::from(viewport_size.1);
+            let scale_x = 2.0 / map_view.width;
+            let scale_y = -2.0 / map_view.height;
             for tvt in &textured_visible_tiles {
                 let minmax = [
                     tvt.tex_minmax.x1 as f32,

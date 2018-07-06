@@ -140,29 +140,25 @@ impl MapViewGl {
             self.mercator_tile_layer.prepare_draw(cx, &self.tile_atlas);
         }
 
-        //TODO remove viewport_size parameter
         self.mercator_tile_layer.draw(
             cx,
             &self.map_view,
             source,
             &mut self.tile_cache,
             &mut self.tile_atlas,
-            self.viewport_size,
             snap_to_pixel
         )
     }
 
-    fn draw_marker(&mut self, cx: &mut Context, snap_to_pixel: bool) {
+    fn draw_mercator_marker(&mut self, cx: &mut Context, snap_to_pixel: bool) {
         if self.last_draw_type != DrawType::Markers {
             self.last_draw_type = DrawType::Markers;
             self.marker_layer.prepare_draw(cx);
         }
 
-        //TODO remove viewport_size parameter
-        self.marker_layer.draw(
+        self.marker_layer.draw_mercator(
             cx,
             &self.map_view,
-            self.viewport_size,
             self.dpi_factor,
             snap_to_pixel,
         );
@@ -194,7 +190,7 @@ impl MapViewGl {
             Projection::Mercator => {
                 let ret = self.draw_mercator_tiles(cx, source, snap_to_pixel);
                 if !self.marker_layer.is_empty() {
-                    self.draw_marker(cx, snap_to_pixel);
+                    self.draw_mercator_marker(cx, snap_to_pixel);
                 }
                 ret
             },
