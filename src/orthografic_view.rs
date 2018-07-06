@@ -2,7 +2,7 @@ use cgmath::{Matrix3, Point3, Transform, vec3};
 use coord::{LatLonRad, TextureRect, TileCoord};
 use map_view::MapView;
 use std::collections::HashSet;
-use std::f32::consts::{PI, FRAC_1_PI};
+use std::f64::consts::{PI, FRAC_1_PI};
 use std::f64;
 
 
@@ -159,7 +159,7 @@ impl OrthograficView {
 
         let transform = Self::transformation_matrix(map_view);
 
-        let point_on_screen = |p: &Point3<f32>| {
+        let point_on_screen = |p: &Point3<_>| {
             p.x >= -1.0 && p.x <= 1.0 && p.y >= -1.0 && p.y <= 1.0
         };
 
@@ -217,22 +217,22 @@ impl OrthograficView {
         tiles
     }
 
-    pub fn transformation_matrix(map_view: &MapView) -> Matrix3<f32> {
+    pub fn transformation_matrix(map_view: &MapView) -> Matrix3<f64> {
         let (scale_x, scale_y) = {
-            let factor = 2.0f32.powf(map_view.zoom as f32) *
-                (FRAC_1_PI * map_view.tile_size as f32);
-            (factor / map_view.width as f32, factor / map_view.height as f32)
+            let factor = 2.0f64.powf(map_view.zoom) *
+                (FRAC_1_PI * map_view.tile_size as f64);
+            (factor / map_view.width, factor / map_view.height)
         };
 
-        let scale_mat: Matrix3<f32> = Matrix3::from_cols(
+        let scale_mat: Matrix3<f64> = Matrix3::from_cols(
             vec3(scale_x, 0.0, 0.0),
             vec3(0.0, scale_y, 0.0),
             vec3(0.0, 0.0, 1.0),
         );
 
-        let rot_mat_x: Matrix3<f32> = {
+        let rot_mat_x: Matrix3<f64> = {
             let center_latlon = map_view.center.to_latlon_rad();
-            let alpha = center_latlon.lon as f32 + (PI * 0.5);
+            let alpha = center_latlon.lon + (PI * 0.5);
             let cosa = alpha.cos();
             let sina = alpha.sin();
                 Matrix3::from_cols(
@@ -242,9 +242,9 @@ impl OrthograficView {
             )
         };
 
-        let rot_mat_y: Matrix3<f32> = {
+        let rot_mat_y: Matrix3<f64> = {
             let center_latlon = map_view.center.to_latlon_rad();
-            let alpha = (-center_latlon.lat) as f32;
+            let alpha = -center_latlon.lat;
             let cosa = alpha.cos();
             let sina = alpha.sin();
                 Matrix3::from_cols(
@@ -254,8 +254,8 @@ impl OrthograficView {
             )
         };
 
-        let transform = Transform::<Point3<f32>>::concat(&rot_mat_y, &rot_mat_x);
-        let transform = Transform::<Point3<f32>>::concat(&scale_mat, &transform);
+        let transform = Transform::<Point3<f64>>::concat(&rot_mat_y, &rot_mat_x);
+        let transform = Transform::<Point3<f64>>::concat(&scale_mat, &transform);
         transform
     }
 }

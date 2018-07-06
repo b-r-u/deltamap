@@ -60,13 +60,9 @@ impl LatLonRad {
     }
 
     /// Convert to 3D Point on unit sphere.
-    pub fn to_sphere_point3(&self) -> Point3<f32> {
+    pub fn to_sphere_point3(&self) -> Point3<f64> {
         let p = self.to_sphere_xyz();
-        Point3::new(
-            p.x as f32,
-            p.y as f32,
-            p.z as f32,
-        )
+        Point3::new(p.x, p.y, p.z)
     }
 }
 
