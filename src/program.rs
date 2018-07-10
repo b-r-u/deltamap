@@ -25,6 +25,11 @@ pub struct ProgramId {
     id: u32,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct UniformId {
+    id: i32,
+}
+
 impl ProgramId {
     /// Returns an invalid `ProgramId`.
     pub fn invalid() -> Self {
@@ -133,6 +138,28 @@ impl Program {
 
             cx.gl.Uniform1i(tex_loc, texture.unit().index() as i32);
         }
+    }
+
+
+    pub fn get_uniform_id(&mut self, cx: &mut Context, uniform_name: &CStr) -> Option<UniformId> {
+        cx.use_program(self.program_id);
+        let loc: i32 = unsafe {
+            cx.gl.GetUniformLocation(self.program_id.index(), uniform_name.as_ptr() as *const _)
+        };
+        check_gl_errors!(cx);
+
+        if loc == -1 {
+            None
+        } else {
+            Some(UniformId { id: loc })
+        }
+    }
+
+    pub fn set_uniform_2f(&mut self, cx: &mut Context, uniform_id: UniformId, v0: f32, v1: f32) {
+        cx.use_program(self.program_id);
+        unsafe {
+            cx.gl.Uniform2f(uniform_id.id, v0, v1);
+        };
     }
 
     //TODO rename function or integrate into new()

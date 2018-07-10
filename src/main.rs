@@ -17,11 +17,13 @@ extern crate reqwest;
 extern crate scoped_threadpool;
 extern crate toml;
 
-pub mod args;
-pub mod buffer;
-pub mod config;
 #[macro_use]
 pub mod context;
+
+pub mod args;
+pub mod atmos_layer;
+pub mod buffer;
+pub mod config;
 pub mod coord;
 pub mod map_view;
 pub mod map_view_gl;
@@ -208,6 +210,14 @@ fn handle_event(
                     VirtualKeyCode::G => {
                         if modifiers.ctrl {
                             map.toggle_projection();
+                            Action::Redraw
+                        } else {
+                            Action::Nothing
+                        }
+                    },
+                    VirtualKeyCode::H => {
+                        if modifiers.ctrl {
+                            map.toggle_atmosphere();
                             Action::Redraw
                         } else {
                             Action::Nothing

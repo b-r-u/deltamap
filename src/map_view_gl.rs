@@ -1,3 +1,4 @@
+use atmos_layer::AtmosLayer;
 use context::Context;
 use coord::{MapCoord, ScreenCoord};
 use map_view::MapView;
@@ -27,7 +28,9 @@ pub struct MapViewGl {
     mercator_tile_layer: MercatorTileLayer,
     marker_layer: MarkerLayer,
     ortho_tile_layer: OrthoTileLayer,
+    atmos_layer: AtmosLayer,
     projection: Projection,
+    show_atmos: bool,
     last_draw_type: DrawType,
 }
 
@@ -37,6 +40,7 @@ enum DrawType {
     Tiles,
     Markers,
     OrthoTiles,
+    Atmos,
 }
 
 impl MapViewGl {
@@ -83,6 +87,7 @@ impl MapViewGl {
 
         let mercator_tile_layer = MercatorTileLayer::new(cx, &tile_atlas);
         let ortho_tile_layer = OrthoTileLayer::new(cx, &tile_atlas);
+        let atmos_layer = AtmosLayer::new(cx);
 
         MapViewGl {
             map_view,
@@ -93,7 +98,9 @@ impl MapViewGl {
             mercator_tile_layer,
             marker_layer: MarkerLayer::new(cx),
             ortho_tile_layer,
+            atmos_layer,
             projection: Projection::Mercator,
+            show_atmos: false,
             last_draw_type: DrawType::Null,
         }
     }
@@ -130,6 +137,10 @@ impl MapViewGl {
             Projection::Mercator => Projection::Orthografic,
             Projection::Orthografic => Projection::Mercator,
         };
+    }
+
+    pub fn toggle_atmosphere(&mut self) {
+        self.show_atmos = !self.show_atmos;
     }
 
     fn draw_mercator_tiles(&mut self, cx: &mut Context, source: &TileSource, snap_to_pixel: bool)
@@ -192,6 +203,18 @@ impl MapViewGl {
         )
     }
 
+    fn draw_atmos(&mut self, cx: &mut Context) {
+        if self.last_draw_type != DrawType::Atmos {
+            self.last_draw_type = DrawType::Atmos;
+            self.atmos_layer.prepare_draw(cx);
+        }
+
+        self.atmos_layer.draw(
+            cx,
+            &self.map_view,
+        )
+    }
+
     /// Returns `Err` when tile cache is too small for this view.
     /// Returns the number of OpenGL draw calls, which can be decreased to `1` by increasing the
     /// size of the tile atlas.
@@ -211,6 +234,9 @@ impl MapViewGl {
                 let ret = self.draw_ortho_tiles(cx, source);
                 if !self.marker_layer.is_empty() {
                     self.draw_ortho_marker(cx);
+                }
+                if self.show_atmos {
+                    self.draw_atmos(cx);
                 }
                 ret
             },

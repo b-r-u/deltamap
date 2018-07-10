@@ -217,11 +217,14 @@ impl OrthograficView {
         tiles
     }
 
+    pub fn radius_physical_pixels(map_view: &MapView) -> f64 {
+        2.0f64.powf(map_view.zoom) * (FRAC_1_PI * map_view.tile_size as f64)
+    }
+
     pub fn transformation_matrix(map_view: &MapView) -> Matrix3<f64> {
         let (scale_x, scale_y) = {
-            let factor = 2.0f64.powf(map_view.zoom) *
-                (FRAC_1_PI * map_view.tile_size as f64);
-            (factor / map_view.width, factor / map_view.height)
+            let radius = Self::radius_physical_pixels(map_view);
+            (radius / map_view.width, radius / map_view.height)
         };
 
         let scale_mat: Matrix3<f64> = Matrix3::from_cols(
