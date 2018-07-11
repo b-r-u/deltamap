@@ -151,7 +151,7 @@ fn handle_event(
                             input_state.mouse_position.x * input_state.dpi_factor,
                             input_state.mouse_position.y * input_state.dpi_factor,
                         ),
-                        f64::from(delta.y) * (1.0 / 320.0),
+                        delta.y * (1.0 / 320.0),
                     );
                 }
                 Action::Redraw

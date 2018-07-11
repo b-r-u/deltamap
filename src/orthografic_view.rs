@@ -126,9 +126,9 @@ impl OrthograficView {
         //TODO Add a little safety margin since the rendered globe is not a perfect sphere and its
         // screen area is underestimated by the tesselation.
         let sphere_diameter = 2.0f64.powf(map_view.zoom) *
-            (f64::consts::FRAC_1_PI * map_view.tile_size as f64);
+            (f64::consts::FRAC_1_PI * f64::from(map_view.tile_size));
 
-        return map_view.width.hypot(map_view.height) < sphere_diameter;
+        map_view.width.hypot(map_view.height) < sphere_diameter
     }
 
     /// Returns the tile zoom value that is used for rendering with the current zoom.
@@ -175,9 +175,9 @@ impl OrthograficView {
 
             if vertices.iter().all(|v| v.z > 0.0) {
                 // Tile is on the backside of the sphere
-                return false;
+                false
             } else {
-                return vertices.iter().any(&point_on_screen);
+                vertices.iter().any(&point_on_screen)
             }
         };
 
@@ -192,25 +192,18 @@ impl OrthograficView {
 
         let mut neighbors = Vec::with_capacity(4);
 
-        loop {
-            if let Some(tn) = stack.pop() {
-                match tn {
-                    TileNeighbor::Coord(tc) => {
-                        if tile_is_visible(tc) {
-                            tiles.push(tc.into());
-                            tile_neighbors(tc, &mut neighbors);
-                            for tn in &neighbors {
-                                if !visited.contains(tn) {
-                                    visited.insert(*tn);
-                                    stack.push(*tn);
-                                }
-                            }
+        while let Some(tn) = stack.pop() {
+            if let TileNeighbor::Coord(tc) = tn {
+                if tile_is_visible(tc) {
+                    tiles.push(tc.into());
+                    tile_neighbors(tc, &mut neighbors);
+                    for tn in &neighbors {
+                        if !visited.contains(tn) {
+                            visited.insert(*tn);
+                            stack.push(*tn);
                         }
-                    },
-                    _ => {},
+                    }
                 }
-            } else {
-                break;
             }
         }
 
@@ -218,7 +211,7 @@ impl OrthograficView {
     }
 
     pub fn radius_physical_pixels(map_view: &MapView) -> f64 {
-        2.0f64.powf(map_view.zoom) * (FRAC_1_PI * map_view.tile_size as f64)
+        2.0f64.powf(map_view.zoom) * (FRAC_1_PI * f64::from(map_view.tile_size))
     }
 
     pub fn transformation_matrix(map_view: &MapView) -> Matrix3<f64> {
@@ -257,9 +250,10 @@ impl OrthograficView {
             )
         };
 
-        let transform = Transform::<Point3<f64>>::concat(&rot_mat_y, &rot_mat_x);
-        let transform = Transform::<Point3<f64>>::concat(&scale_mat, &transform);
-        transform
+        Transform::<Point3<f64>>::concat(
+            &scale_mat,
+            &Transform::<Point3<f64>>::concat(&rot_mat_y, &rot_mat_x)
+        )
     }
 }
 

@@ -3,6 +3,7 @@ use projection::Projection;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::str::FromStr;
 use toml::Value;
 use toml::value::Table;
 use toml;
@@ -65,7 +66,7 @@ impl Session {
 
                 let projection = match view.get("projection") {
                     Some(&Value::String(ref s)) => {
-                        Projection::from_str(s).unwrap_or_else(|| Projection::Mercator)
+                        Projection::from_str(s).unwrap_or_else(|_| Projection::Mercator)
                     },
                     Some(_) => return Err("projection has to be a string.".to_string()),
                     None => Projection::Mercator,

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Projection {
@@ -7,7 +9,6 @@ pub enum Projection {
     Orthografic,
 }
 
-
 impl Projection {
     pub fn to_str(&self) -> &str {
         match *self {
@@ -15,12 +16,16 @@ impl Projection {
             Projection::Orthografic => "orthografic",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Option<Projection> {
+impl FromStr for Projection {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, ()> {
         match s {
-            "mercator" => Some(Projection::Mercator),
-            "orthografic" => Some(Projection::Orthografic),
-            _ => None,
+            "mercator" => Ok(Projection::Mercator),
+            "orthografic" => Ok(Projection::Orthografic),
+            _ => Err(()),
         }
     }
 }

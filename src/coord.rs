@@ -429,8 +429,8 @@ impl TileCoord {
 
         TileCoord {
             zoom: self.zoom,
-            x: x,
-            y: y,
+            x,
+            y,
         }
     }
 

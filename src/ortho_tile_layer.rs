@@ -31,8 +31,8 @@ impl LatScreenEllipse {
     fn new(view_center: LatLonRad, viewport_size: (u32, u32), sphere_radius: f64, lat: f64) -> Self {
         LatScreenEllipse {
             center: ScreenCoord {
-                x: viewport_size.0 as f64 * 0.5,
-                y: viewport_size.1 as f64 * 0.5 * (lat - view_center.lat).sin() * sphere_radius,
+                x: f64::from(viewport_size.0) * 0.5,
+                y: f64::from(viewport_size.1) * 0.5 * (lat - view_center.lat).sin() * sphere_radius,
             },
             radius_x: lat.cos() * sphere_radius,
             radius_y: lat.cos() * -view_center.lat.sin() * sphere_radius,
