@@ -159,10 +159,6 @@ impl OrthograficView {
 
         let transform = Self::transformation_matrix(map_view);
 
-        let point_on_screen = |p: &Point3<_>| {
-            p.x >= -1.0 && p.x <= 1.0 && p.y >= -1.0 && p.y <= 1.0
-        };
-
         let tile_is_visible = |tc: TileCoord| -> bool {
             let nw = tc.latlon_rad_north_west();
             let se = tc.latlon_rad_south_east();
@@ -177,7 +173,12 @@ impl OrthograficView {
                 // Tile is on the backside of the sphere
                 false
             } else {
-                vertices.iter().any(&point_on_screen)
+                // Check bounding box of vertices against screen.
+                //TODO Create true bounding box of tile that also accounts for curved borders.
+                vertices.iter().fold(false, |acc, v| acc || v.x >= -1.0) &&
+                vertices.iter().fold(false, |acc, v| acc || v.x <= 1.0) &&
+                vertices.iter().fold(false, |acc, v| acc || v.y >= -1.0) &&
+                vertices.iter().fold(false, |acc, v| acc || v.y <= 1.0)
             }
         };
 
@@ -231,7 +232,7 @@ impl OrthograficView {
             let alpha = center_latlon.lon + (PI * 0.5);
             let cosa = alpha.cos();
             let sina = alpha.sin();
-                Matrix3::from_cols(
+            Matrix3::from_cols(
                 vec3(cosa, 0.0, -sina),
                 vec3(0.0, 1.0, 0.0),
                 vec3(sina, 0.0, cosa),
@@ -243,7 +244,7 @@ impl OrthograficView {
             let alpha = -center_latlon.lat;
             let cosa = alpha.cos();
             let sina = alpha.sin();
-                Matrix3::from_cols(
+            Matrix3::from_cols(
                 vec3(1.0, 0.0, 0.0),
                 vec3(0.0, cosa, sina),
                 vec3(0.0, -sina, cosa),
