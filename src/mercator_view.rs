@@ -61,6 +61,22 @@ impl MercatorView {
         }
     }
 
+    /// Returns the map coordinate that corresponds to the given screen coordinate.
+    pub fn screen_to_map_coord(map_view: &MapView, screen_coord: ScreenCoord) -> MapCoord {
+        let scale = f64::powf(2.0, -map_view.zoom) / f64::from(map_view.tile_size);
+
+        let delta_x = screen_coord.x - map_view.width * 0.5;
+        let delta_y = screen_coord.y - map_view.height * 0.5;
+
+        let mut m = MapCoord {
+            x: map_view.center.x + delta_x * scale,
+            y: map_view.center.y + delta_y * scale,
+        };
+
+        m.normalize_x();
+        m
+    }
+
     /// Returns true if the viewport rectangle is fully inside the map.
     pub fn covers_viewport(map_view: &MapView) -> bool {
         let scale = f64::powf(2.0, -map_view.zoom) / f64::from(map_view.tile_size);

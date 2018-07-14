@@ -1,5 +1,5 @@
 use cgmath::{Matrix3, Point3, Transform, vec3};
-use coord::{LatLonRad, TextureRect, TileCoord};
+use coord::{LatLonRad, ScreenCoord, TextureRect, TileCoord};
 use map_view::MapView;
 use std::collections::HashSet;
 use std::f64::consts::{PI, FRAC_1_PI};
@@ -227,8 +227,9 @@ impl OrthograficView {
             vec3(0.0, 0.0, 1.0),
         );
 
+        let center_latlon = map_view.center.to_latlon_rad();
+
         let rot_mat_x: Matrix3<f64> = {
-            let center_latlon = map_view.center.to_latlon_rad();
             let alpha = center_latlon.lon + (PI * 0.5);
             let cosa = alpha.cos();
             let sina = alpha.sin();
@@ -240,7 +241,6 @@ impl OrthograficView {
         };
 
         let rot_mat_y: Matrix3<f64> = {
-            let center_latlon = map_view.center.to_latlon_rad();
             let alpha = -center_latlon.lat;
             let cosa = alpha.cos();
             let sina = alpha.sin();
@@ -255,6 +255,69 @@ impl OrthograficView {
             &scale_mat,
             &Transform::<Point3<f64>>::concat(&rot_mat_y, &rot_mat_x)
         )
+    }
+
+    // Returns the inverse rotation matrix of the given view.
+    pub fn inv_rotation_matrix(map_view: &MapView) -> Matrix3<f64> {
+        let center_latlon = map_view.center.to_latlon_rad();
+
+        let rot_mat_x: Matrix3<f64> = {
+            let alpha = -center_latlon.lon - (PI * 0.5);
+            let cosa = alpha.cos();
+            let sina = alpha.sin();
+            Matrix3::from_cols(
+                vec3(cosa, 0.0, -sina),
+                vec3(0.0, 1.0, 0.0),
+                vec3(sina, 0.0, cosa),
+            )
+        };
+
+        let rot_mat_y: Matrix3<f64> = {
+            let alpha = center_latlon.lat;
+            let cosa = alpha.cos();
+            let sina = alpha.sin();
+            Matrix3::from_cols(
+                vec3(1.0, 0.0, 0.0),
+                vec3(0.0, cosa, sina),
+                vec3(0.0, -sina, cosa),
+            )
+        };
+
+        Transform::<Point3<f64>>::concat(&rot_mat_x, &rot_mat_y)
+    }
+
+    // Returns the coordinates of the location that is nearest to the given `ScreenCoord`.
+    pub fn screen_coord_to_latlonrad(map_view: &MapView, screen_coord: ScreenCoord) -> LatLonRad {
+        // Point on unit sphere
+        let sphere_point = {
+            let recip_radius = 2.0 * Self::radius_physical_pixels(map_view).recip();
+            let sx = (screen_coord.x - map_view.width * 0.5) * recip_radius;
+            let sy = (screen_coord.y - map_view.height * 0.5) * -recip_radius;
+            let t = 1.0 - sx * sx - sy * sy;
+            if t >= 0.0 {
+                // screen_coord is on the sphere
+                Point3::new(
+                    sx,
+                    sy,
+                    -(t.sqrt()),
+                )
+            } else {
+                // screen_coord is outside of sphere -> pick nearest.
+                let scale = sx.hypot(sy).recip();
+                Point3::new(
+                    sx * scale,
+                    sy * scale,
+                    0.0,
+                )
+            }
+        };
+
+        // Rotate
+        let inv_trans = Self::inv_rotation_matrix(map_view);
+        let p = inv_trans.transform_point(sphere_point);
+
+        // Transform to latitude, longitude
+        LatLonRad::new(p.y.asin(), p.z.atan2(p.x))
     }
 }
 
