@@ -25,8 +25,8 @@ impl MercatorTileLayer {
     ) -> MercatorTileLayer
     {
         let buffer = Buffer::new(cx, &[], 0);
-        check_gl_errors!(cx);
         cx.bind_buffer(buffer.id());
+        check_gl_errors!(cx);
 
         let mut program = Program::new(
             cx,
@@ -51,8 +51,6 @@ impl MercatorTileLayer {
             CStr::from_bytes_with_nul(b"tex_minmax\0").unwrap(),
             &VertexAttribParams::new(4, 8, 4)
         );
-
-        check_gl_errors!(cx);
 
         MercatorTileLayer {
             program,

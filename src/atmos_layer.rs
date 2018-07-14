@@ -51,8 +51,6 @@ impl AtmosLayer {
 
         let scale_uniform = program.get_uniform_id(cx, CStr::from_bytes_with_nul(b"scale\0").unwrap()).unwrap();
 
-        check_gl_errors!(cx);
-
         AtmosLayer {
             buffer,
             program,

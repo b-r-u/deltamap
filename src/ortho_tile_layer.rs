@@ -75,8 +75,6 @@ impl OrthoTileLayer {
             &VertexAttribParams::new(4, 9, 5)
         );
 
-        check_gl_errors!(cx);
-
         OrthoTileLayer {
             program,
             buffer,

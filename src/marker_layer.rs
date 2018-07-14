@@ -31,7 +31,6 @@ impl MarkerLayer {
             include_bytes!("../shader/marker.vert"),
             include_bytes!("../shader/marker.frag"),
         ).unwrap();
-        check_gl_errors!(cx);
 
         //TODO Create textures for higher DPI factors / use mipmaps
         let texture = {
