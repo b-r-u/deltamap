@@ -123,12 +123,12 @@ pub struct OrthograficView {
 impl OrthograficView {
     /// Returns true if the rendering covers the whole viewport.
     pub fn covers_viewport(map_view: &MapView) -> bool {
-        //TODO Add a little safety margin since the rendered globe is not a perfect sphere and its
-        // screen area is underestimated by the tesselation.
         let sphere_diameter = 2.0f64.powf(map_view.zoom) *
             (f64::consts::FRAC_1_PI * f64::from(map_view.tile_size));
 
-        map_view.width.hypot(map_view.height) < sphere_diameter
+        // Add a little safety margin (the constant factor) since the rendered globe is not a
+        // perfect sphere and its screen area is underestimated by the tesselation.
+        map_view.width.hypot(map_view.height) < sphere_diameter * 0.9
     }
 
     /// Returns the tile zoom value that is used for rendering with the current zoom.

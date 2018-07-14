@@ -6,6 +6,7 @@ use marker_layer::MarkerLayer;
 use mercator_tile_layer::MercatorTileLayer;
 use mercator_view::MercatorView;
 use ortho_tile_layer::OrthoTileLayer;
+use orthografic_view::OrthograficView;
 use projection::Projection;
 use session::Session;
 use texture::{Texture, TextureFormat};
@@ -122,9 +123,7 @@ impl MapViewGl {
     pub fn map_covers_viewport(&self) -> bool {
         match self.projection {
             Projection::Mercator => MercatorView::covers_viewport(&self.map_view),
-            //TODO uncomment
-            //Projection::Orthografic => OrthograficView::covers_viewport(&self.map_view),
-            Projection::Orthografic => false,
+            Projection::Orthografic => OrthograficView::covers_viewport(&self.map_view),
         }
     }
 
