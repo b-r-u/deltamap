@@ -211,14 +211,14 @@ impl OrthograficView {
         tiles
     }
 
-    pub fn radius_physical_pixels(map_view: &MapView) -> f64 {
+    pub fn diameter_physical_pixels(map_view: &MapView) -> f64 {
         2.0f64.powf(map_view.zoom) * (FRAC_1_PI * f64::from(map_view.tile_size))
     }
 
     pub fn transformation_matrix(map_view: &MapView) -> Matrix3<f64> {
         let (scale_x, scale_y) = {
-            let radius = Self::radius_physical_pixels(map_view);
-            (radius / map_view.width, radius / map_view.height)
+            let diam = Self::diameter_physical_pixels(map_view);
+            (diam / map_view.width, diam / map_view.height)
         };
 
         let scale_mat: Matrix3<f64> = Matrix3::from_cols(
@@ -290,7 +290,7 @@ impl OrthograficView {
     pub fn screen_coord_to_latlonrad(map_view: &MapView, screen_coord: ScreenCoord) -> LatLonRad {
         // Point on unit sphere
         let sphere_point = {
-            let recip_radius = 2.0 * Self::radius_physical_pixels(map_view).recip();
+            let recip_radius = 2.0 * Self::diameter_physical_pixels(map_view).recip();
             let sx = (screen_coord.x - map_view.width * 0.5) * recip_radius;
             let sy = (screen_coord.y - map_view.height * 0.5) * -recip_radius;
             let t = 1.0 - sx * sx - sy * sy;

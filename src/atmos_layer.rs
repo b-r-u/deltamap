@@ -72,8 +72,8 @@ impl AtmosLayer {
         map_view: &MapView,
     ) {
         let (scale_x, scale_y) = {
-            let radius = OrthograficView::radius_physical_pixels(map_view);
-            ((radius / map_view.width) as f32, (radius / map_view.height) as f32)
+            let diam = OrthograficView::diameter_physical_pixels(map_view);
+            ((diam / map_view.width) as f32, (diam / map_view.height) as f32)
         };
 
         self.program.set_uniform_2f(cx, self.scale_uniform, scale_x, scale_y);
