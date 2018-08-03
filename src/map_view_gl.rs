@@ -266,15 +266,22 @@ impl MapViewGl {
     }
 
     pub fn zoom_at(&mut self, pos: ScreenCoord, zoom_delta: f64) {
-        //TODO implement for OrthograficView
-        if self.map_view.zoom + zoom_delta < MIN_ZOOM_LEVEL {
-            MercatorView::set_zoom_at(&mut self.map_view, pos, MIN_ZOOM_LEVEL);
-        } else if self.map_view.zoom + zoom_delta > MAX_ZOOM_LEVEL {
-            MercatorView::set_zoom_at(&mut self.map_view, pos, MAX_ZOOM_LEVEL);
-        } else {
-            MercatorView::zoom_at(&mut self.map_view, pos, zoom_delta);
+        match self.projection {
+            Projection::Mercator => {
+                if self.map_view.zoom + zoom_delta < MIN_ZOOM_LEVEL {
+                    MercatorView::set_zoom_at(&mut self.map_view, pos, MIN_ZOOM_LEVEL);
+                } else if self.map_view.zoom + zoom_delta > MAX_ZOOM_LEVEL {
+                    MercatorView::set_zoom_at(&mut self.map_view, pos, MAX_ZOOM_LEVEL);
+                } else {
+                    MercatorView::zoom_at(&mut self.map_view, pos, zoom_delta);
+                }
+                self.map_view.center.normalize_xy();
+            },
+            Projection::Orthografic => {
+                //TODO ensure new zoom level in between min/max zoom level
+                OrthograficView::zoom_at(&mut self.map_view, pos, zoom_delta);
+            },
         }
-        self.map_view.center.normalize_xy();
     }
 
     pub fn change_tile_zoom_offset(&mut self, delta_offset: f64) {

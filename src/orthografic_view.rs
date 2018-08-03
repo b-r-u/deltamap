@@ -287,7 +287,7 @@ impl OrthograficView {
     }
 
     // Returns the coordinates of the location that is nearest to the given `ScreenCoord`.
-    pub fn screen_coord_to_latlonrad(map_view: &MapView, screen_coord: ScreenCoord) -> LatLonRad {
+    pub fn screen_coord_to_sphere_point(map_view: &MapView, screen_coord: ScreenCoord) -> Point3<f64> {
         // Point on unit sphere
         let sphere_point = {
             let recip_radius = 2.0 * Self::diameter_physical_pixels(map_view).recip();
@@ -314,11 +314,33 @@ impl OrthograficView {
 
         // Rotate
         let inv_trans = Self::inv_rotation_matrix(map_view);
-        let p = inv_trans.transform_point(sphere_point);
+        inv_trans.transform_point(sphere_point)
+    }
+
+    // Returns the coordinates of the location that is nearest to the given `ScreenCoord`.
+    pub fn screen_coord_to_latlonrad(map_view: &MapView, screen_coord: ScreenCoord) -> LatLonRad {
+        let p = Self::screen_coord_to_sphere_point(map_view, screen_coord);
 
         // Transform to latitude, longitude
         LatLonRad::new(p.y.asin(), p.z.atan2(p.x))
     }
+
+    /// Change zoom value by `zoom_delta` and zoom to a position given in screen coordinates.
+    pub fn zoom_at(map_view: &mut MapView, pos: ScreenCoord, zoom_delta: f64) {
+        //TODO Do something sophisticated: Increase zoom and rotate slightly so that the given
+        // ScreenCoord points to the same geographical location.
+        /*
+        let latlon = Self::screen_coord_to_latlonrad(map_view, pos);
+
+        let delta_x = pos.x - map_view.width * 0.5;
+        let delta_y = pos.y - map_view.height * 0.5;
+
+        map_view.center = latlon.into();
+        */
+
+        map_view.zoom += zoom_delta;
+    }
+
 }
 
 #[cfg(test)]
