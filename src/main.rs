@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 extern crate cgmath;
 #[macro_use]
 extern crate clap;
