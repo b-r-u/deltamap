@@ -1,5 +1,5 @@
 #version 100
-precision mediump float;
+precision highp float;
 
 attribute vec3 position;
 attribute vec2 tex_coord;

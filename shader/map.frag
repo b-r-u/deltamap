@@ -1,5 +1,5 @@
 #version 100
-precision mediump float;
+precision highp float;
 
 varying vec2 v_tex;
 varying vec4 v_tex_minmax;
