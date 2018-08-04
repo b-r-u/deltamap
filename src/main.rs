@@ -192,7 +192,9 @@ fn handle_event(
                         map.move_pixel(0.0, 50.0);
                         Action::Redraw
                     },
-                    VirtualKeyCode::Add => {
+                    VirtualKeyCode::Add |
+                    //TODO Remove this workaround for the Windows virtual key code mapping
+                    VirtualKeyCode::Equals => {
                         if modifiers.ctrl {
                             map.change_tile_zoom_offset(1.0);
                         } else {
@@ -200,6 +202,7 @@ fn handle_event(
                         }
                         Action::Redraw
                     },
+                    VirtualKeyCode::Minus |
                     VirtualKeyCode::Subtract => {
                         if modifiers.ctrl {
                             map.change_tile_zoom_offset(-1.0);
