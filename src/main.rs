@@ -90,6 +90,7 @@ fn handle_event(
     sources: &mut TileSources,
     marker_rx: &mpsc::Receiver<Vec<LatLonDeg>>,
 ) -> Action {
+    trace!("{:?}", event);
     match *event {
         Event::Awakened => {
             for pos in marker_rx.try_iter().flat_map(|c| c.into_iter()) {
