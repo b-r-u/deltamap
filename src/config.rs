@@ -12,7 +12,11 @@ static DEFAULT_CONFIG: &'static str = "";
 static DEFAULT_TILE_SOURCES: &'static str = include_str!("../default_tile_sources.toml");
 
 lazy_static! {
-    static ref PROJ_DIRS: ProjectDirs = ProjectDirs::from("", "", "DeltaMap");
+    static ref PROJ_DIRS: Option<ProjectDirs> = ProjectDirs::from("", "", "DeltaMap");
+}
+
+fn proj_dirs_result() -> Result<&'static ProjectDirs, String> {
+    PROJ_DIRS.as_ref().ok_or_else(|| "could not retrieve project directories".to_string())
 }
 
 
@@ -77,7 +81,7 @@ impl Config {
     }
 
     fn find_or_create() -> Result<Config, String> {
-        let config_dir = PROJ_DIRS.config_dir();
+        let config_dir = proj_dirs_result()?.config_dir();
         let config_file = {
             let mut path = PathBuf::from(config_dir);
             path.push("config.toml");
@@ -110,7 +114,7 @@ impl Config {
     }
 
     fn add_tile_sources_from_default_or_create(&mut self) -> Result<(), String> {
-        let config_dir = PROJ_DIRS.config_dir();
+        let config_dir = proj_dirs_result()?.config_dir();
         let sources_file = {
             let mut path = PathBuf::from(config_dir);
             path.push("tile_sources.toml");
@@ -142,14 +146,6 @@ impl Config {
         }
     }
 
-    /// Returns a tile cache directory path at a standard location. The returned path may not
-    /// exist.
-    fn default_tile_cache_dir() -> PathBuf {
-        let mut path = PathBuf::from(PROJ_DIRS.cache_dir());
-        path.push("tiles");
-        path
-    }
-
     fn from_toml_str<P: AsRef<Path>>(toml_str: &str, config_path: Option<P>) -> Result<Config, String> {
         match toml_str.parse::<Value>() {
             Ok(Value::Table(ref table)) => {
@@ -161,7 +157,11 @@ impl Config {
                                    .ok_or_else(|| "tile_cache_dir has to be a string".to_string())?
                             )
                         },
-                        None => Config::default_tile_cache_dir(),
+                        None => {
+                            let mut path = PathBuf::from(proj_dirs_result()?.cache_dir());
+                            path.push("tiles");
+                            path
+                        },
                     }
                 };
 
@@ -430,7 +430,7 @@ fn create_config_file<P: AsRef<Path> + Debug>(dir_path: P, file_path: P, content
 
 pub fn read_last_session() -> Result<Session, String> {
     let session_path = {
-        let config_dir = PROJ_DIRS.config_dir();
+        let config_dir = proj_dirs_result()?.config_dir();
         let mut path = PathBuf::from(config_dir);
         path.push("last_session.toml");
         path
@@ -440,7 +440,7 @@ pub fn read_last_session() -> Result<Session, String> {
 
 pub fn save_session(session: &Session) -> Result<(), String>
 {
-    let config_dir = PROJ_DIRS.config_dir();
+    let config_dir = proj_dirs_result()?.config_dir();
     let session_path = {
         let mut path = PathBuf::from(config_dir);
         path.push("last_session.toml");
