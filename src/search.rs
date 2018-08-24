@@ -1,6 +1,6 @@
 use coord::LatLonDeg;
 use osmpbf::{Blob, BlobDecode, BlobReader, PrimitiveBlock};
-use regex::Regex;
+use query::{find_query_matches, QueryArgs, QueryKind};
 use scoped_threadpool::Pool;
 use std::collections::hash_set::HashSet;
 use std::path::{Path, PathBuf};
@@ -31,7 +31,7 @@ enum WorkerMessage {
 
 pub fn par_search<P, F, G>(
     pbf_path: P,
-    search_pattern: &str,
+    query_args: QueryArgs,
     found_func: F,
     finished_func: G,
 ) -> Result<thread::JoinHandle<()>, String>
@@ -40,9 +40,8 @@ where P: AsRef<Path>,
       G: Fn(Result<(), String>) + Send + 'static,
 {
     let pbf_path = PathBuf::from(pbf_path.as_ref());
-    let search_pattern = search_pattern.to_string();
     let handle = thread::spawn(move|| {
-        let res = par_search_blocking(pbf_path, &search_pattern, found_func);
+        let res = par_search_blocking(pbf_path, query_args, found_func);
         finished_func(res);
     });
 
@@ -51,48 +50,30 @@ where P: AsRef<Path>,
 
 pub fn par_search_blocking<P, F>(
     pbf_path: P,
-    search_pattern: &str,
+    query_args: QueryArgs,
     found_func: F,
 ) -> Result<(), String>
 where P: AsRef<Path>,
       F: Fn(Vec<LatLonDeg>) -> ControlFlow + Send + 'static,
 {
-    let re = Regex::new(search_pattern)
-        .map_err(|e| format!("{}", e))?;
-    let re = &re;
+    let query = query_args.compile()?;
+    let query = &query;
 
     let first_pass = move |block: &PrimitiveBlock, _: &()| {
         let mut matches = vec![];
         let mut way_node_ids = vec![];
 
-        for node in block.groups().flat_map(|g| g.nodes()) {
-            for (_key, val) in node.tags() {
-                if re.is_match(val) {
-                    let pos = LatLonDeg::new(node.lat(), node.lon());
-                    matches.push(pos);
-                    break;
-                }
-            }
-        }
-
-        for node in block.groups().flat_map(|g| g.dense_nodes()) {
-            for (_key, val) in node.tags() {
-                if re.is_match(val) {
-                    let pos = LatLonDeg::new(node.lat(), node.lon());
-                    matches.push(pos);
-                    break;
-                }
-            }
-        }
-
-        for way in block.groups().flat_map(|g| g.ways()) {
-            for (_key, val) in way.tags() {
-                if re.is_match(val) && !way.refs_slice().is_empty() {
-                    //TODO take middle node, not first one
-                    way_node_ids.push(way.refs_slice()[0]);
-                    break;
-                }
-            }
+        match query {
+            &QueryKind::ValuePattern(ref query) => {
+                find_query_matches(block, query, &mut matches, &mut way_node_ids);
+            },
+            &QueryKind::KeyValue(ref query) => {
+                find_query_matches(block, query, &mut matches, &mut way_node_ids);
+            },
+            _ => {
+                //TODO implement
+                unimplemented!();
+            },
         }
 
         (matches, way_node_ids)

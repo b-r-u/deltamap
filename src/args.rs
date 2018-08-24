@@ -34,6 +34,21 @@ pub fn parse<'a>() -> clap::ArgMatches<'a> {
             .value_name("PATTERN")
             .help("Search for places which match the given pattern")
             .takes_value(true))
+        .arg(Arg::with_name("keyval")
+            .short("k")
+            .long("keyval")
+            .value_name("KEY:VALUE")
+            .validator(|s| {
+                let colons = (s.split(':').count() - 1).max(0);
+                if colons == 1 {
+                    Ok(())
+                } else {
+                    Err(format!("exactly one colon (':') is required to separate key and value, \
+                                found {}", colons))
+                }
+            })
+            .help("Search for places that are tagged with the given key and value")
+            .takes_value(true))
         .arg(Arg::with_name("fps")
             .long("fps")
             .value_name("FPS")

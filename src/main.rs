@@ -36,6 +36,7 @@ pub mod ortho_tile_layer;
 pub mod orthografic_view;
 pub mod program;
 pub mod projection;
+pub mod query;
 pub mod search;
 pub mod session;
 pub mod texture;
@@ -314,12 +315,13 @@ fn run() -> Result<(), Box<Error>> {
     }
 
     let (marker_tx, marker_rx) = mpsc::channel();
-    if let (Some(path), Some(pattern)) = (config.pbf_path(), config.search_pattern()) {
+
+    if let (Some(path), Some(query_args)) = (config.pbf_path(), config.query_args()) {
         let proxy = events_loop.create_proxy();
 
         search::par_search(
             path,
-            pattern,
+            query_args,
             move |coords| {
                 if coords.is_empty() {
                     search::ControlFlow::Continue
