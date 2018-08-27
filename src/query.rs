@@ -154,10 +154,13 @@ impl Query for KeyValueQuery {
         return false;
     }
 
-    fn dense_node_matches(&self, _bi: &Self::BI, dnode: &DenseNode) -> bool {
-        //TODO use raw tags
-        for (key, val) in dnode.tags() {
-            if key == self.key && val == self.value {
+    fn dense_node_matches(&self, bi: &Self::BI, dnode: &DenseNode) -> bool {
+        for (key, val) in dnode.raw_tags() {
+            if key >= 0 &&
+               val >= 0 &&
+               bi.0.binary_search(&(key as u32)).is_ok() &&
+               bi.1.binary_search(&(val as u32)).is_ok()
+            {
                 return true;
             }
         }
