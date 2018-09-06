@@ -351,8 +351,14 @@ fn compare_tiles(a: Tile, b: Tile, view: View) -> Ordering {
             } else {
                 let map_a = a.coord.map_coord_center();
                 let map_b = b.coord.map_coord_center();
-                let center_diff_a = (view.center.x - map_a.x).hypot(view.center.y - map_a.y);
-                let center_diff_b = (view.center.x - map_b.x).hypot(view.center.y - map_b.y);
+                let diff_xa = (view.center.x - map_a.x).abs();
+                let diff_xa = if diff_xa > 0.5 { 1.0 - diff_xa } else { diff_xa };
+                let diff_xb = (view.center.x - map_b.x).abs();
+                let diff_xb = if diff_xb > 0.5 { 1.0 - diff_xb } else { diff_xb };
+                let diff_ya = view.center.y - map_a.y;
+                let diff_yb = view.center.y - map_b.y;
+                let center_diff_a = (diff_xa * diff_xa) + (diff_ya * diff_ya);
+                let center_diff_b = (diff_xb * diff_xb) + (diff_yb * diff_yb);
 
                 center_diff_b.partial_cmp(&center_diff_a).unwrap_or(Ordering::Equal)
             }
