@@ -116,7 +116,7 @@ impl MercatorView {
         for y in 0..num_tiles_y {
             for x in 0..num_tiles_x {
                 let t = TileCoord::new(uzoom, start_tile_x + x, start_tile_y + y);
-                if t.is_on_planet() {
+                if t.is_valid() {
                     visible_tiles.push(
                         VisibleTile {
                             tile: t,

@@ -255,7 +255,7 @@ impl SubTileCoord {
 /// A tile position in a tile pyramid.
 /// Each zoom level has 2<sup>zoom</sup> by 2<sup>zoom</sup> tiles.
 /// `x` and `y` are allowed to be negative or >= 2<sup>zoom</sup> but then they will not correspond to a tile
-/// and `is_on_planet` will return false.
+/// and `is_valid` will return false.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TileCoord {
     pub zoom: u32,
@@ -272,10 +272,21 @@ impl TileCoord {
         }
     }
 
-    pub fn is_on_planet(&self) -> bool {
+    pub fn is_valid(&self) -> bool {
         let num_tiles = Self::get_zoom_level_tiles(self.zoom);
         self.y >= 0 && self.y < num_tiles &&
         self.x >= 0 && self.x < num_tiles
+    }
+
+    /// Returns the nearest valid `TileCoord`. This wraps the x coordinate and clamps the y
+    /// coordinate.
+    pub fn nearest_valid(&self) -> Self {
+        let num_tiles = Self::get_zoom_level_tiles(self.zoom);
+        TileCoord {
+            zoom: self.zoom,
+            x: ((self.x % num_tiles) + num_tiles) % num_tiles,
+            y: self.y.min(num_tiles - 1).max(0),
+        }
     }
 
     // Return the MapCoord of the top left corner of the current tile.
@@ -288,22 +299,10 @@ impl TileCoord {
     pub fn latlon_rad_north_west(&self) -> LatLonRad {
         let factor = f64::powi(2.0, -(self.zoom as i32)) * (2.0 * PI);
 
-        if self.y == 0 {
-            LatLonRad::new(
-                0.5 * PI,
-                f64::from(self.x) * factor - PI,
-            )
-        } else if self.y == Self::get_zoom_level_tiles(self.zoom) {
-            LatLonRad::new(
-                -0.5 * PI,
-                f64::from(self.x) * factor - PI,
-            )
-        } else {
-            LatLonRad::new(
-                (PI - f64::from(self.y) * factor).sinh().atan(),
-                f64::from(self.x) * factor - PI,
-            )
-        }
+        LatLonRad::new(
+            (PI - f64::from(self.y) * factor).sinh().atan(),
+            f64::from(self.x) * factor - PI,
+        )
     }
 
     // Return the LatLonRad coordinate of the bottom right corner of the current tile.
@@ -410,28 +409,6 @@ impl TileCoord {
     fn normalize_coord(coord: i32, zoom: u32) -> i32 {
         let max = Self::get_zoom_level_tiles(zoom);
         ((coord % max) + max) % max
-    }
-
-    /// Wrap around in x-direction.
-    /// Values for y that are out-of-bounds "rotate" around the globe and also influence the
-    /// x-coordinate.
-    pub fn globe_norm(&self) -> Self {
-        let max = Self::get_zoom_level_tiles(self.zoom);
-        let period = max * 2;
-
-        let yp = ((self.y % period) + period) % period;
-        let side = yp / max;
-
-        let x = self.x + side * (max / 2);
-        let x = ((x % max) + max) % max;
-
-        let y = (1 - side) * yp + side * (period - 1 - yp);
-
-        TileCoord {
-            zoom: self.zoom,
-            x,
-            y,
-        }
     }
 
     #[inline]
@@ -542,6 +519,33 @@ mod tests {
         assert_eq!(TileCoord::new(30, 0, 1).to_quadkey(), Some("000000000000000000000000000002".to_string()));
     }
 
+    fn tc(zoom: u32, x: i32, y: i32) -> TileCoord {
+        TileCoord { zoom, x, y }
+    }
+
+    #[test]
+    fn nearest_valid() {
+        assert_eq!(tc(0, 0, 0).nearest_valid(), tc(0, 0, 0));
+        assert_eq!(tc(0, -1, 0).nearest_valid(), tc(0, 0, 0));
+        assert_eq!(tc(0, 1, 0).nearest_valid(), tc(0, 0, 0));
+        assert_eq!(tc(0, 0, -1).nearest_valid(), tc(0, 0, 0));
+        assert_eq!(tc(0, 0, 1).nearest_valid(), tc(0, 0, 0));
+
+        assert_eq!(tc(1, 0, 0).nearest_valid(), tc(1, 0, 0));
+        assert_eq!(tc(1, -1, 0).nearest_valid(), tc(1, 1, 0));
+        assert_eq!(tc(1, 1, 0).nearest_valid(), tc(1, 1, 0));
+        assert_eq!(tc(1, 0, -1).nearest_valid(), tc(1, 0, 0));
+        assert_eq!(tc(1, 0, 1).nearest_valid(), tc(1, 0, 1));
+        assert_eq!(tc(1, 0, 2).nearest_valid(), tc(1, 0, 1));
+
+        assert_eq!(tc(2, 0, 0).nearest_valid(), tc(2, 0, 0));
+        assert_eq!(tc(2, 4, 0).nearest_valid(), tc(2, 0, 0));
+        assert_eq!(tc(2, 5, 0).nearest_valid(), tc(2, 1, 0));
+        assert_eq!(tc(2, -1, 0).nearest_valid(), tc(2, 3, 0));
+        assert_eq!(tc(2, 0, 4).nearest_valid(), tc(2, 0, 3));
+        assert_eq!(tc(2, 0, -1).nearest_valid(), tc(2, 0, 0));
+    }
+
     fn approx_eq(a: f64, b: f64) -> bool {
         (a - b).abs() < 1e-10
     }
@@ -591,18 +595,6 @@ mod tests {
     }
 
     #[test]
-    fn tile_to_latlon() {
-        // Test edge cases at the poles where the longitude is technically undefined.
-        let t = TileCoord::new(0, 0, 0);
-        let deg = t.latlon_rad_north_west();
-        assert!(approx_eq(deg.lat, 0.5 * PI));
-        assert!(approx_eq(deg.lon, -PI));
-        let deg = t.latlon_rad_south_east();
-        assert!(approx_eq(deg.lat, -0.5 * PI));
-        assert!(approx_eq(deg.lon, PI));
-    }
-
-    #[test]
     fn tile_children() {
         let t = TileCoord::new(2, 1, 2);
         for (&(a1, a2), (b1, b2)) in t.children().iter().zip(t.children_iter(1)) {
@@ -613,29 +605,5 @@ mod tests {
         assert_eq!(t.children_iter(0).next(), Some((t, SubTileCoord{ size: 1, x: 0, y: 0 })));
         assert_eq!(t.children_iter(1).count(), 4);
         assert_eq!(t.children_iter(2).count(), 16);
-    }
-
-    #[test]
-    fn globe_norm() {
-        assert_eq!(TileCoord::new(0, 0, 0).globe_norm(), TileCoord::new(0, 0, 0));
-        assert_eq!(TileCoord::new(0, -1, 0).globe_norm(), TileCoord::new(0, 0, 0));
-        assert_eq!(TileCoord::new(0, -1, -1).globe_norm(), TileCoord::new(0, 0, 0));
-        assert_eq!(TileCoord::new(0, 0, 1).globe_norm(), TileCoord::new(0, 0, 0));
-
-        assert_eq!(TileCoord::new(2, 0, 0).globe_norm(), TileCoord::new(2, 0, 0));
-        assert_eq!(TileCoord::new(2, 0, 3).globe_norm(), TileCoord::new(2, 0, 3));
-        assert_eq!(TileCoord::new(2, 0, 4).globe_norm(), TileCoord::new(2, 2, 3));
-        assert_eq!(TileCoord::new(2, 0, 5).globe_norm(), TileCoord::new(2, 2, 2));
-        assert_eq!(TileCoord::new(2, 0, 8).globe_norm(), TileCoord::new(2, 0, 0));
-
-        assert_eq!(TileCoord::new(2, 3, 0).globe_norm(), TileCoord::new(2, 3, 0));
-        assert_eq!(TileCoord::new(2, 3, 3).globe_norm(), TileCoord::new(2, 3, 3));
-        assert_eq!(TileCoord::new(2, 3, 4).globe_norm(), TileCoord::new(2, 1, 3));
-        assert_eq!(TileCoord::new(2, 3, 5).globe_norm(), TileCoord::new(2, 1, 2));
-        assert_eq!(TileCoord::new(2, 3, 8).globe_norm(), TileCoord::new(2, 3, 0));
-
-        assert_eq!(TileCoord::new(2, -1, 0).globe_norm(), TileCoord::new(2, 3, 0));
-        assert_eq!(TileCoord::new(2, 0, -1).globe_norm(), TileCoord::new(2, 2, 0));
-        assert_eq!(TileCoord::new(2, 0, -5).globe_norm(), TileCoord::new(2, 0, 3));
     }
 }

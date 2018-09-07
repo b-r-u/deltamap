@@ -76,6 +76,16 @@ pub fn tile_neighbors(origin: TileCoord, result: &mut Vec<TileNeighbor>) {
                     origin.x,
                     origin.y + 1,
                 )),
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    (origin.x + 1) % zoom_level_tiles,
+                    origin.y,
+                )),
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    (origin.x + zoom_level_tiles - 1) % zoom_level_tiles,
+                    origin.y,
+                )),
             ]);
         },
         (_, y) if y == zoom_level_tiles - 1 => {
@@ -85,6 +95,16 @@ pub fn tile_neighbors(origin: TileCoord, result: &mut Vec<TileNeighbor>) {
                     origin.zoom,
                     origin.x,
                     origin.y - 1,
+                )),
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    (origin.x + 1) % zoom_level_tiles,
+                    origin.y,
+                )),
+                TileNeighbor::Coord(TileCoord::new(
+                    origin.zoom,
+                    (origin.x + zoom_level_tiles - 1) % zoom_level_tiles,
+                    origin.y,
                 )),
             ]);
         },
@@ -155,7 +175,7 @@ impl OrthograficView {
             _ => {},
         }
 
-        let center_tile = map_view.center.on_tile_at_zoom(uzoom).globe_norm();
+        let center_tile = map_view.center.on_tile_at_zoom(uzoom).nearest_valid();
 
         let transform = Self::transformation_matrix(map_view);
 
@@ -367,11 +387,11 @@ mod tests {
         assert!(result.iter().find(|&&x| x == TileNeighbor::Coord(TileCoord::new(1, 1, 1))).is_none());
 
         tile_neighbors(TileCoord::new(2, 0, 0), &mut result);
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.len(), 4);
         assert!(result.iter().find(|&&x| x == TileNeighbor::NorthPole).is_some());
 
         tile_neighbors(TileCoord::new(2, 0, 3), &mut result);
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.len(), 4);
         assert!(result.iter().find(|&&x| x == TileNeighbor::SouthPole).is_some());
 
         tile_neighbors(TileCoord::new(2, 3, 1), &mut result);
