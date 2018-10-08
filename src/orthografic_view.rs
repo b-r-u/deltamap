@@ -361,6 +361,11 @@ impl OrthograficView {
         map_view.zoom += zoom_delta;
     }
 
+    /// Change zoom value by `zoom_delta` and zoom to a position given in screen coordinates.
+    pub fn set_zoom_at(map_view: &mut MapView, pos: ScreenCoord, zoom: f64) {
+        //TODO Do something sophisticated, just like with Self::zoom_at
+        map_view.zoom = zoom;
+    }
 }
 
 #[cfg(test)]

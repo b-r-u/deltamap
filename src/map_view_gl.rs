@@ -1,7 +1,7 @@
 use atmos_layer::AtmosLayer;
 use context::Context;
 use coord::{MapCoord, ScreenCoord};
-use map_view::MapView;
+use map_view::{MapView, MIN_ZOOM_LEVEL, MAX_ZOOM_LEVEL};
 use marker_layer::MarkerLayer;
 use mercator_tile_layer::MercatorTileLayer;
 use mercator_view::MercatorView;
@@ -14,9 +14,6 @@ use tile_atlas::TileAtlas;
 use tile_cache::TileCache;
 use tile_source::TileSource;
 
-
-const MIN_ZOOM_LEVEL: f64 = 0.0;
-const MAX_ZOOM_LEVEL: f64 = 22.0;
 
 #[derive(Debug)]
 pub struct MapViewGl {
@@ -57,15 +54,11 @@ impl MapViewGl {
     {
         let tile_size = 256;
 
-        let mut map_view = MercatorView::initial_map_view(
+        let map_view = MercatorView::initial_map_view(
             f64::from(initial_size.0),
             f64::from(initial_size.1),
             tile_size,
         );
-
-        if map_view.zoom < MIN_ZOOM_LEVEL {
-            map_view.zoom = MIN_ZOOM_LEVEL;
-        }
 
         let atlas_size = {
             let default_size = 2048;
@@ -242,27 +235,12 @@ impl MapViewGl {
         }
     }
 
-    pub fn step_zoom(&mut self, steps: i32, step_size: f64) {
-        let new_zoom = {
-            let z = (self.map_view.zoom + f64::from(steps) * step_size) / step_size;
-            if steps > 0 {
-                z.ceil() * step_size
-            } else {
-                z.floor() * step_size
-            }
-        }.max(MIN_ZOOM_LEVEL).min(MAX_ZOOM_LEVEL);
-
-        self.map_view.set_zoom(new_zoom);
+    pub fn zoom(&mut self, zoom_delta: f64) {
+        self.map_view.zoom(zoom_delta);
     }
 
-    pub fn zoom(&mut self, zoom_delta: f64) {
-        if self.map_view.zoom + zoom_delta < MIN_ZOOM_LEVEL {
-            self.map_view.set_zoom(MIN_ZOOM_LEVEL);
-        } else if self.map_view.zoom + zoom_delta > MAX_ZOOM_LEVEL {
-            self.map_view.set_zoom(MAX_ZOOM_LEVEL);
-        } else {
-            self.map_view.zoom(zoom_delta);
-        }
+    pub fn step_zoom(&mut self, steps: i32, step_size: f64) {
+        self.map_view.step_zoom(steps, step_size);
     }
 
     pub fn zoom_at(&mut self, pos: ScreenCoord, zoom_delta: f64) {
@@ -278,8 +256,13 @@ impl MapViewGl {
                 self.map_view.center.normalize_xy();
             },
             Projection::Orthografic => {
-                //TODO ensure new zoom level in between min/max zoom level
-                OrthograficView::zoom_at(&mut self.map_view, pos, zoom_delta);
+                if self.map_view.zoom + zoom_delta < MIN_ZOOM_LEVEL {
+                    OrthograficView::set_zoom_at(&mut self.map_view, pos, MIN_ZOOM_LEVEL);
+                } else if self.map_view.zoom + zoom_delta > MAX_ZOOM_LEVEL {
+                    OrthograficView::set_zoom_at(&mut self.map_view, pos, MAX_ZOOM_LEVEL);
+                } else {
+                    OrthograficView::zoom_at(&mut self.map_view, pos, zoom_delta);
+                }
             },
         }
     }
@@ -299,7 +282,9 @@ impl MapViewGl {
     pub fn restore_session(&mut self, session: &Session) {
         self.map_view.center = session.view_center;
         self.map_view.center.normalize_xy();
-        self.map_view.zoom = MIN_ZOOM_LEVEL.max(MAX_ZOOM_LEVEL.min(session.zoom));
+        self.map_view.zoom = session.zoom
+            .max(MIN_ZOOM_LEVEL)
+            .min(MAX_ZOOM_LEVEL);
         self.projection = session.projection;
     }
 

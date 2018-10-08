@@ -1,6 +1,9 @@
 use coord::MapCoord;
 
 
+pub const MIN_ZOOM_LEVEL: f64 = 0.0;
+pub const MAX_ZOOM_LEVEL: f64 = 22.0;
+
 /// A view of a map with a rectangular viewport and a zoom.
 #[derive(Clone, Debug)]
 pub struct MapView {
@@ -51,11 +54,26 @@ impl MapView {
 
     /// Set the zoom value.
     pub fn set_zoom(&mut self, zoom: f64) {
-        self.zoom = zoom;
+        self.zoom = zoom
+            .max(MIN_ZOOM_LEVEL)
+            .min(MAX_ZOOM_LEVEL);
     }
 
     /// Change zoom value by `zoom_delta`.
     pub fn zoom(&mut self, zoom_delta: f64) {
-        self.zoom += zoom_delta;
+        self.zoom = (self.zoom + zoom_delta)
+            .max(MIN_ZOOM_LEVEL)
+            .min(MAX_ZOOM_LEVEL);
+    }
+
+    pub fn step_zoom(&mut self, steps: i32, step_size: f64) {
+        self.zoom = {
+            let z = (self.zoom + f64::from(steps) * step_size) / step_size;
+            if steps > 0 {
+                z.ceil() * step_size
+            } else {
+                z.floor() * step_size
+            }
+        }.max(MIN_ZOOM_LEVEL).min(MAX_ZOOM_LEVEL);
     }
 }

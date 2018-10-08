@@ -1,5 +1,5 @@
 use coord::{MapCoord, ScreenCoord, ScreenRect, TextureRect, TileCoord};
-use map_view::MapView;
+use map_view::{MapView, MIN_ZOOM_LEVEL, MAX_ZOOM_LEVEL};
 
 
 /// A view of a tiled map with a rectangular viewport and a zoom.
@@ -27,7 +27,9 @@ impl MercatorView {
     /// with the given dimensions.
     pub fn initial_map_view(width: f64, height: f64, tile_size: u32) -> MapView {
         let min_dimension = width.min(height);
-        let zoom = (min_dimension / f64::from(tile_size)).log2().ceil();
+        let zoom = (min_dimension / f64::from(tile_size)).log2().ceil()
+            .max(MIN_ZOOM_LEVEL)
+            .min(MAX_ZOOM_LEVEL);
         MapView {
             width,
             height,
