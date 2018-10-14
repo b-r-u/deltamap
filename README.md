@@ -9,7 +9,7 @@ Rust](https://www.rust-lang.org/install.html) to compile the program. The
 minimum supported version of Rust for DeltaMap is **1.25**.
 
 On Linux you will also need OpenSSL with headers.
-(see https://github.com/sfackler/rust-openssl for details)
+(see <https://docs.rs/crate/openssl/0.10.12> for details)
 
 ```sh
 # On Debian and Ubuntu
