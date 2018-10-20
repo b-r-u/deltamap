@@ -1,7 +1,7 @@
 use ::context;
 use ::image;
 use context::{Context, TextureUnit};
-use image::GenericImage;
+use image::GenericImageView;
 use std::os::raw::c_void;
 
 #[derive(Clone, Debug)]
