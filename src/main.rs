@@ -222,6 +222,14 @@ fn handle_event(
                             Action::Nothing
                         }
                     },
+                    VirtualKeyCode::M => {
+                        if modifiers.ctrl {
+                            map.toggle_marker();
+                            Action::Redraw
+                        } else {
+                            Action::Nothing
+                        }
+                    },
                     VirtualKeyCode::H => {
                         if modifiers.ctrl {
                             map.toggle_atmosphere();

@@ -28,6 +28,7 @@ pub struct MapViewGl {
     ortho_tile_layer: OrthoTileLayer,
     atmos_layer: AtmosLayer,
     projection: Projection,
+    show_marker: bool,
     show_atmos: bool,
     last_draw_type: DrawType,
 }
@@ -94,6 +95,7 @@ impl MapViewGl {
             ortho_tile_layer,
             atmos_layer,
             projection: Projection::Mercator,
+            show_marker: true,
             show_atmos: false,
             last_draw_type: DrawType::Null,
         }
@@ -129,6 +131,10 @@ impl MapViewGl {
             Projection::Mercator => Projection::Orthografic,
             Projection::Orthografic => Projection::Mercator,
         };
+    }
+
+    pub fn toggle_marker(&mut self) {
+        self.show_marker = !self.show_marker;
     }
 
     pub fn toggle_atmosphere(&mut self) {
@@ -217,14 +223,14 @@ impl MapViewGl {
         match self.projection {
             Projection::Mercator => {
                 let ret = self.draw_mercator_tiles(cx, source, snap_to_pixel);
-                if !self.marker_layer.is_empty() {
+                if self.show_marker && !self.marker_layer.is_empty() {
                     self.draw_mercator_marker(cx, snap_to_pixel);
                 }
                 ret
             },
             Projection::Orthografic => {
                 let ret = self.draw_ortho_tiles(cx, source);
-                if !self.marker_layer.is_empty() {
+                if self.show_marker && !self.marker_layer.is_empty() {
                     self.draw_ortho_marker(cx);
                 }
                 if self.show_atmos {
