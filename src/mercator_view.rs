@@ -60,11 +60,14 @@ impl MercatorView {
     }
 
     pub fn from_orthografic_view(ortho: &OrthograficView) -> Self {
+        let latlon = ortho.center.to_latlon_rad();
+        let zoom_delta = (1.0 / latlon.lat.cos()).log2();
+
         MercatorView {
             viewport_size: ortho.viewport_size,
             tile_size: ortho.tile_size,
             center: ortho.center,
-            zoom: ortho.zoom,
+            zoom: ortho.zoom - zoom_delta,
             tile_zoom_offset: ortho.tile_zoom_offset,
         }
     }

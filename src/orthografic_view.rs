@@ -177,11 +177,13 @@ impl OrthograficView {
     }
 
     pub fn from_mercator_view(merc: &MercatorView) -> Self {
+        let latlon = merc.center.to_latlon_rad();
+        let zoom_delta = (1.0 / latlon.lat.cos()).log2();
         OrthograficView {
             viewport_size: merc.viewport_size,
             tile_size: merc.tile_size,
             center: merc.center,
-            zoom: merc.zoom,
+            zoom: merc.zoom + zoom_delta,
             tile_zoom_offset: merc.tile_zoom_offset,
         }
     }
