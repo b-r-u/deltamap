@@ -1,10 +1,16 @@
-use cgmath::{Matrix3, Point3, Transform, vec3};
-use coord::{LatLonRad, ScreenCoord, TextureRect, TileCoord};
-use map_view::MapView;
+use cgmath::{Matrix3, Point3, Transform, vec3, Vector2};
+use coord::{LatLonRad, MapCoord, ScreenCoord, TextureRect, TileCoord};
+use mercator_view::MercatorView;
+use projection::Projection;
 use std::collections::HashSet;
 use std::f64::consts::{PI, FRAC_1_PI};
 use std::f64;
+use toml::Value;
+use toml::value::Table;
 
+
+pub const MIN_ZOOM_LEVEL: f64 = 0.0;
+pub const MAX_ZOOM_LEVEL: f64 = 22.0;
 
 #[derive(Clone, Debug)]
 pub struct VisibleTile {
@@ -136,31 +142,124 @@ pub fn tile_neighbors(origin: TileCoord, result: &mut Vec<TileNeighbor>) {
 }
 
 
+/// Orthographic projection, WGS 84 coordinates mapped to the sphere
 #[derive(Clone, Debug)]
 pub struct OrthograficView {
+    /// Size of the viewport in physical pixels.
+    pub viewport_size: Vector2<f64>,
+    /// Size of each square tile in the same unit as the viewport dimensions.
+    pub tile_size: u32,
+    /// The `MapCoord` that corresponds to the center of the viewport.
+    pub center: MapCoord,
+    /// The zoom value. The zoom factor is given by 2.0.powf(zoom);
+    pub zoom: f64,
+    /// Tiles only exist for integer zoom values. The tile zoom value that is used for rendering
+    /// is computed by the `tile_zoom` method. Increasing `tile_zoom_offset` increases the number
+    /// of visible tiles for a given zoom value.
+    pub tile_zoom_offset: f64,
 }
 
 impl OrthograficView {
+    /// Constructs a new `OrthograficView`.
+    pub fn new(
+        viewport_size: Vector2<f64>,
+        tile_size: u32,
+        center: MapCoord,
+        zoom: f64
+    ) -> OrthograficView {
+        OrthograficView {
+            viewport_size,
+            tile_size,
+            center,
+            zoom,
+            tile_zoom_offset: 0.0,
+        }
+    }
+
+    pub fn from_mercator_view(merc: &MercatorView) -> Self {
+        OrthograficView {
+            viewport_size: merc.viewport_size,
+            tile_size: merc.tile_size,
+            center: merc.center,
+            zoom: merc.zoom,
+            tile_zoom_offset: merc.tile_zoom_offset,
+        }
+    }
+
+    pub fn from_toml_table(
+        table: &Table,
+        viewport_size: Vector2<f64>,
+        tile_size: u32,
+    ) -> Result<Self, String> {
+        let x = match table.get("x") {
+            Some(&Value::Float(x)) => x,
+            Some(&Value::Integer(x)) => x as f64,
+            Some(_) => return Err("x has to be a number.".to_string()),
+            None => return Err("x position is missing.".to_string()),
+        };
+
+        let y = match table.get("y") {
+            Some(&Value::Float(y)) => y,
+            Some(&Value::Integer(y)) => y as f64,
+            Some(_) => return Err("y has to be a number.".to_string()),
+            None => return Err("y position is missing.".to_string()),
+        };
+
+        let zoom = match table.get("zoom") {
+            Some(&Value::Float(z)) => z,
+            Some(&Value::Integer(z)) => z as f64,
+            Some(_) => return Err("zoom has to be a number.".to_string()),
+            None => return Err("zoom value is missing.".to_string()),
+        }.min(MAX_ZOOM_LEVEL).max(MIN_ZOOM_LEVEL);
+
+        if let Some(&Value::String(ref s)) = table.get("projection") {
+            if s != "orthografic" {
+                return Err("try to deserialize wrong projection".to_string());
+            }
+        }
+
+        Ok(OrthograficView {
+            viewport_size,
+            tile_size,
+            center: MapCoord::new(x, y),
+            zoom,
+            tile_zoom_offset: 0.0,
+        })
+    }
+
+    pub fn toml_table(&self) -> Table {
+        let mut table = Table::new();
+        table.insert("projection".to_string(), Value::String(Self::projection().to_str().to_string()));
+        table.insert("x".to_string(), Value::Float(self.center.x));
+        table.insert("y".to_string(), Value::Float(self.center.y));
+        table.insert("zoom".to_string(), Value::Float(self.zoom));
+        table
+    }
+
+    pub fn projection() -> Projection {
+        Projection::Orthografic
+    }
+
     /// Returns true if the rendering covers the whole viewport.
-    pub fn covers_viewport(map_view: &MapView) -> bool {
-        let sphere_diameter = 2.0f64.powf(map_view.zoom) *
-            (f64::consts::FRAC_1_PI * f64::from(map_view.tile_size));
+    pub fn covers_viewport(&self) -> bool {
+        let sphere_diameter = 2.0f64.powf(self.zoom) *
+            (f64::consts::FRAC_1_PI * f64::from(self.tile_size));
 
         // Add a little safety margin (the constant factor) since the rendered globe is not a
         // perfect sphere and its screen area is underestimated by the tesselation.
-        map_view.width.hypot(map_view.height) < sphere_diameter * 0.9
+        self.viewport_size.x.hypot(self.viewport_size.y) < sphere_diameter * 0.9
     }
 
     /// Returns the tile zoom value that is used for rendering with the current zoom.
     //TODO Insert real implementation. Add TileCoord parameter -> lower resolution at the poles
-    pub fn tile_zoom(map_view: &MapView) -> u32 {
-        (map_view.zoom + map_view.tile_zoom_offset).floor().max(0.0) as u32
+    pub fn tile_zoom(&self) -> u32 {
+        (self.zoom + self.tile_zoom_offset).floor().max(0.0) as u32
     }
 
     //TODO Return the transformation matrix that is used here to avoid redundant calculation.
     /// Returns a `Vec` of all tiles that are visible in the current viewport.
-    pub fn visible_tiles(map_view: &MapView) -> Vec<VisibleTile> {
-        let uzoom = Self::tile_zoom(map_view);
+    pub fn visible_tiles(&self) -> Vec<VisibleTile> {
+        let uzoom = self.tile_zoom();
 
         match uzoom {
             0 => return vec![TileCoord::new(0, 0, 0).into()],
@@ -175,9 +274,9 @@ impl OrthograficView {
             _ => {},
         }
 
-        let center_tile = map_view.center.on_tile_at_zoom(uzoom).nearest_valid();
+        let center_tile = self.center.on_tile_at_zoom(uzoom).nearest_valid();
 
-        let transform = Self::transformation_matrix(map_view);
+        let transform = self.transformation_matrix();
 
         let tile_is_visible = |tc: TileCoord| -> bool {
             let nw = tc.latlon_rad_north_west();
@@ -231,14 +330,14 @@ impl OrthograficView {
         tiles
     }
 
-    pub fn diameter_physical_pixels(map_view: &MapView) -> f64 {
-        2.0f64.powf(map_view.zoom) * (FRAC_1_PI * f64::from(map_view.tile_size))
+    pub fn diameter_physical_pixels(&self) -> f64 {
+        2.0f64.powf(self.zoom) * (FRAC_1_PI * f64::from(self.tile_size))
     }
 
-    pub fn transformation_matrix(map_view: &MapView) -> Matrix3<f64> {
+    pub fn transformation_matrix(&self) -> Matrix3<f64> {
         let (scale_x, scale_y) = {
-            let diam = Self::diameter_physical_pixels(map_view);
-            (diam / map_view.width, diam / map_view.height)
+            let diam = self.diameter_physical_pixels();
+            (diam / self.viewport_size.x, diam / self.viewport_size.y)
         };
 
         let scale_mat: Matrix3<f64> = Matrix3::from_cols(
@@ -247,7 +346,7 @@ impl OrthograficView {
             vec3(0.0, 0.0, 1.0),
         );
 
-        let center_latlon = map_view.center.to_latlon_rad();
+        let center_latlon = self.center.to_latlon_rad();
 
         let rot_mat_x: Matrix3<f64> = {
             let alpha = center_latlon.lon + (PI * 0.5);
@@ -278,8 +377,8 @@ impl OrthograficView {
     }
 
     // Returns the inverse rotation matrix of the given view.
-    pub fn inv_rotation_matrix(map_view: &MapView) -> Matrix3<f64> {
-        let center_latlon = map_view.center.to_latlon_rad();
+    pub fn inv_rotation_matrix(&self) -> Matrix3<f64> {
+        let center_latlon = self.center.to_latlon_rad();
 
         let rot_mat_x: Matrix3<f64> = {
             let alpha = -center_latlon.lon - (PI * 0.5);
@@ -307,12 +406,12 @@ impl OrthograficView {
     }
 
     // Returns the coordinates of the location that is nearest to the given `ScreenCoord`.
-    pub fn screen_coord_to_sphere_point(map_view: &MapView, screen_coord: ScreenCoord) -> Point3<f64> {
+    pub fn screen_coord_to_sphere_point(&self, screen_coord: ScreenCoord) -> Point3<f64> {
         // Point on unit sphere
         let sphere_point = {
-            let recip_radius = 2.0 * Self::diameter_physical_pixels(map_view).recip();
-            let sx = (screen_coord.x - map_view.width * 0.5) * recip_radius;
-            let sy = (screen_coord.y - map_view.height * 0.5) * -recip_radius;
+            let recip_radius = 2.0 * self.diameter_physical_pixels().recip();
+            let sx = (screen_coord.x - self.viewport_size.x * 0.5) * recip_radius;
+            let sy = (screen_coord.y - self.viewport_size.y * 0.5) * -recip_radius;
             let t = 1.0 - sx * sx - sy * sy;
             if t >= 0.0 {
                 // screen_coord is on the sphere
@@ -333,38 +432,58 @@ impl OrthograficView {
         };
 
         // Rotate
-        let inv_trans = Self::inv_rotation_matrix(map_view);
+        let inv_trans = self.inv_rotation_matrix();
         inv_trans.transform_point(sphere_point)
     }
 
     // Returns the coordinates of the location that is nearest to the given `ScreenCoord`.
-    pub fn screen_coord_to_latlonrad(map_view: &MapView, screen_coord: ScreenCoord) -> LatLonRad {
-        let p = Self::screen_coord_to_sphere_point(map_view, screen_coord);
+    pub fn screen_coord_to_latlonrad(&self, screen_coord: ScreenCoord) -> LatLonRad {
+        let p = self.screen_coord_to_sphere_point(screen_coord);
 
         // Transform to latitude, longitude
         LatLonRad::new(p.y.asin(), p.z.atan2(p.x))
     }
 
     /// Change zoom value by `zoom_delta` and zoom to a position given in screen coordinates.
-    pub fn zoom_at(map_view: &mut MapView, pos: ScreenCoord, zoom_delta: f64) {
+    pub fn zoom_at(&mut self, pos: ScreenCoord, zoom_delta: f64) {
         //TODO Do something sophisticated: Increase zoom and rotate slightly so that the given
         // ScreenCoord points to the same geographical location.
         /*
-        let latlon = Self::screen_coord_to_latlonrad(map_view, pos);
+        let latlon = self.screen_coord_to_latlonrad(pos);
 
-        let delta_x = pos.x - map_view.width * 0.5;
-        let delta_y = pos.y - map_view.height * 0.5;
+        let delta_x = pos.x - self.viewport_size.x * 0.5;
+        let delta_y = pos.y - self.viewport_size.y * 0.5;
 
-        map_view.center = latlon.into();
+        self.center = latlon.into();
         */
 
-        map_view.zoom += zoom_delta;
+        self.zoom = (self.zoom + zoom_delta).min(MAX_ZOOM_LEVEL).max(MIN_ZOOM_LEVEL);
     }
 
     /// Change zoom value by `zoom_delta` and zoom to a position given in screen coordinates.
-    pub fn set_zoom_at(map_view: &mut MapView, pos: ScreenCoord, zoom: f64) {
-        //TODO Do something sophisticated, just like with Self::zoom_at
-        map_view.zoom = zoom;
+    pub fn set_zoom_at(&mut self, pos: ScreenCoord, zoom: f64) {
+        //TODO Do something sophisticated
+        self.zoom = zoom.min(MAX_ZOOM_LEVEL).max(MIN_ZOOM_LEVEL);
+    }
+
+    pub fn step_zoom(&mut self, steps: i32, step_size: f64) {
+        self.zoom = {
+            let z = (self.zoom + f64::from(steps) * step_size) / step_size;
+            if steps > 0 {
+                z.ceil() * step_size
+            } else {
+                z.floor() * step_size
+            }
+        }.max(MIN_ZOOM_LEVEL).min(MAX_ZOOM_LEVEL);
+    }
+
+    /// Move the center of the viewport by approx. (`delta_x`, `delta_y`) in screen coordinates.
+    pub fn move_pixel(&mut self, delta_x: f64, delta_y: f64) {
+        //TODO Do something more sophisticated
+        let scale = f64::powf(2.0, -self.zoom) / f64::from(self.tile_size);
+        self.center.x += delta_x * scale;
+        self.center.y += delta_y * scale;
+        self.center.normalize_xy();
     }
 }
 

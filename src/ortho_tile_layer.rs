@@ -2,7 +2,6 @@ use buffer::{Buffer, DrawMode};
 use cgmath::Transform;
 use context::Context;
 use coord::{LatLonRad, ScreenCoord, View};
-use map_view::MapView;
 use orthografic_view::OrthograficView;
 use program::Program;
 use std::ffi::CStr;
@@ -91,7 +90,7 @@ impl OrthoTileLayer {
     pub fn draw(
         &mut self,
         cx: &mut Context,
-        map_view: &MapView,
+        ortho: &OrthograficView,
         source: &TileSource,
         cache: &mut TileCache,
         tile_atlas: &mut TileAtlas,
@@ -99,13 +98,13 @@ impl OrthoTileLayer {
         //TODO Add distance function to TileCache that takes topology of the sphere into account.
         cache.set_view_location(View {
             source_id: source.id(),
-            zoom: OrthograficView::tile_zoom(map_view),
-            center: map_view.center,
+            zoom: ortho.tile_zoom(),
+            center: ortho.center,
         });
 
-        let transform = OrthograficView::transformation_matrix(map_view);
+        let transform = ortho.transformation_matrix();
 
-        let visible_tiles = OrthograficView::visible_tiles(map_view);
+        let visible_tiles = ortho.visible_tiles();
         let mut remainder = visible_tiles.as_slice();
         let mut num_draws = 0;
         let mut max_tiles_to_use = cache.max_tiles();

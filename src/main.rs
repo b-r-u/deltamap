@@ -27,7 +27,6 @@ pub mod atmos_layer;
 pub mod buffer;
 pub mod config;
 pub mod coord;
-pub mod map_view;
 pub mod map_view_gl;
 pub mod marker_layer;
 pub mod mercator_tile_layer;
@@ -36,6 +35,7 @@ pub mod ortho_tile_layer;
 pub mod orthografic_view;
 pub mod program;
 pub mod projection;
+pub mod projection_view;
 pub mod query;
 pub mod search;
 pub mod session;
@@ -283,7 +283,7 @@ fn run() -> Result<(), Box<Error>> {
         None
     };
 
-    if let Some(tile_source) = last_session.as_ref().and_then(|s| s.tile_source.as_ref()) {
+    if let Some(tile_source) = last_session.as_ref().and_then(|s| s.tile_source()) {
         sources.switch_to_name(tile_source);
     }
 
@@ -319,7 +319,7 @@ fn run() -> Result<(), Box<Error>> {
     };
 
     if let Some(ref session) = last_session {
-        map.restore_session(session);
+        map.restore_session(session)?;
     }
 
     let (marker_tx, marker_rx) = mpsc::channel();
@@ -463,7 +463,7 @@ fn run() -> Result<(), Box<Error>> {
 
     if config.open_last_session() {
         let mut session = map.to_session();
-        session.tile_source = Some(sources.current_name().to_string());
+        session.set_tile_source(Some(sources.current_name()));
         config::save_session(&session)?;
     }
 

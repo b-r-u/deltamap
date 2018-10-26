@@ -4,7 +4,6 @@ use cgmath::{Matrix3, Point2, Transform, vec2, vec3};
 use context::Context;
 use coord::{MapCoord, ScreenCoord, ScreenRect};
 use image;
-use map_view::MapView;
 use mercator_view::MercatorView;
 use orthografic_view::OrthograficView;
 use program::Program;
@@ -79,7 +78,7 @@ impl MarkerLayer {
     pub fn draw_mercator(
         &mut self,
         cx: &mut Context,
-        map_view: &MapView,
+        merc: &MercatorView,
         dpi_factor: f64,
         snap_to_pixel: bool
     ) {
@@ -88,8 +87,8 @@ impl MarkerLayer {
         let marker_size = vec2::<f64>(40.0, 50.0) * dpi_factor;
         let marker_offset = vec2::<f64>(-20.0, -50.0) * dpi_factor;
 
-        let scale_x = 2.0 / map_view.width as f32;
-        let scale_y = -2.0 / map_view.height as f32;
+        let scale_x = 2.0 / merc.viewport_size.x as f32;
+        let scale_y = -2.0 / merc.viewport_size.y as f32;
 
         let tex_mat: Matrix3<f32> = Matrix3::from_cols(
             vec3(marker_size.x as f32, 0.0, 0.0),
@@ -111,15 +110,15 @@ impl MarkerLayer {
         let visible_rect = ScreenRect {
             x: -(marker_offset.x + marker_size.x),
             y: -(marker_offset.y + marker_size.y),
-            width: map_view.width + marker_size.x,
-            height: map_view.height + marker_size.y,
+            width: merc.viewport_size.x + marker_size.x,
+            height: merc.viewport_size.y + marker_size.y,
         };
 
         for map_pos in &self.positions {
             let screen_pos = {
-                let mut sp = MercatorView::map_to_screen_coord(map_view, *map_pos);
+                let mut sp = merc.map_to_screen_coord(*map_pos);
                 if snap_to_pixel {
-                    let topleft = MercatorView::map_to_screen_coord(map_view, MapCoord::new(0.0, 0.0));
+                    let topleft = merc.map_to_screen_coord(MapCoord::new(0.0, 0.0));
                     let mut snapped = topleft;
                     snapped.snap_to_pixel();
 
@@ -166,7 +165,7 @@ impl MarkerLayer {
     pub fn draw_ortho(
         &mut self,
         cx: &mut Context,
-        map_view: &MapView,
+        ortho: &OrthograficView,
         dpi_factor: f64,
     ) {
         let mut vertex_data: Vec<f32> = vec![];
@@ -174,8 +173,8 @@ impl MarkerLayer {
         let marker_size = vec2::<f64>(40.0, 50.0) * dpi_factor;
         let marker_offset = vec2::<f64>(-20.0, -50.0) * dpi_factor;
 
-        let scale_x = 2.0 / map_view.width as f32;
-        let scale_y = -2.0 / map_view.height as f32;
+        let scale_x = 2.0 / ortho.viewport_size.x as f32;
+        let scale_y = -2.0 / ortho.viewport_size.y as f32;
 
         let tex_mat: Matrix3<f32> = Matrix3::from_cols(
             vec3(marker_size.x as f32, 0.0, 0.0),
@@ -197,11 +196,11 @@ impl MarkerLayer {
         let visible_rect = ScreenRect {
             x: -(marker_offset.x + marker_size.x),
             y: -(marker_offset.y + marker_size.y),
-            width: map_view.width + marker_size.x,
-            height: map_view.height + marker_size.y,
+            width: ortho.viewport_size.x + marker_size.x,
+            height: ortho.viewport_size.y + marker_size.y,
         };
 
-        let transform = OrthograficView::transformation_matrix(map_view);
+        let transform = ortho.transformation_matrix();
 
         for map_pos in &self.positions {
             let screen_pos = {
@@ -212,8 +211,8 @@ impl MarkerLayer {
                 }
 
                 ScreenCoord::new(
-                    (norm_pos.x + 1.0) * (0.5 * map_view.width),
-                    (-norm_pos.y + 1.0) * (0.5 * map_view.height),
+                    (norm_pos.x + 1.0) * (0.5 * ortho.viewport_size.x),
+                    (-norm_pos.y + 1.0) * (0.5 * ortho.viewport_size.y),
                 )
             };
 

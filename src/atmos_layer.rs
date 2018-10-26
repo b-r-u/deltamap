@@ -1,7 +1,6 @@
 use ::std::ffi::CStr;
 use buffer::{Buffer, DrawMode};
 use context::Context;
-use map_view::MapView;
 use orthografic_view::OrthograficView;
 use program::{Program, UniformId};
 use std::f32::consts::PI;
@@ -67,11 +66,11 @@ impl AtmosLayer {
     pub fn draw(
         &mut self,
         cx: &mut Context,
-        map_view: &MapView,
+        ortho: &OrthograficView,
     ) {
         let (scale_x, scale_y) = {
-            let diam = OrthograficView::diameter_physical_pixels(map_view);
-            ((diam / map_view.width) as f32, (diam / map_view.height) as f32)
+            let diam = ortho.diameter_physical_pixels();
+            ((diam / ortho.viewport_size.x) as f32, (diam / ortho.viewport_size.y) as f32)
         };
 
         self.program.set_uniform_2f(cx, self.scale_uniform, scale_x, scale_y);

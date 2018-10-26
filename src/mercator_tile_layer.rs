@@ -2,7 +2,6 @@ use ::std::ffi::CStr;
 use buffer::{Buffer, DrawMode};
 use context::Context;
 use coord::View;
-use map_view::MapView;
 use mercator_view::MercatorView;
 use program::Program;
 use tile_atlas::{TileAtlas, VisibleTilesProvider};
@@ -68,7 +67,7 @@ impl MercatorTileLayer {
     pub fn draw(
         &mut self,
         cx: &mut Context,
-        map_view: &MapView,
+        merc: &MercatorView,
         source: &TileSource,
         cache: &mut TileCache,
         atlas: &mut TileAtlas,
@@ -76,11 +75,11 @@ impl MercatorTileLayer {
     ) -> Result<usize, usize> {
         cache.set_view_location(View {
             source_id: source.id(),
-            zoom: MercatorView::tile_zoom(map_view),
-            center: map_view.center,
+            zoom: merc.tile_zoom(),
+            center: merc.center,
         });
 
-        let visible_tiles = MercatorView::visible_tiles(map_view, snap_to_pixel);
+        let visible_tiles = merc.visible_tiles(snap_to_pixel);
         let mut remainder = visible_tiles.as_slice();
         let mut num_draws = 0;
         let mut max_tiles_to_use = cache.max_tiles();
@@ -99,8 +98,8 @@ impl MercatorTileLayer {
             max_tiles_to_use = max_tiles_to_use.saturating_sub(used_tiles);
 
             let mut vertex_data: Vec<f32> = Vec::with_capacity(textured_visible_tiles.len() * (6 * 8));
-            let scale_x = 2.0 / map_view.width;
-            let scale_y = -2.0 / map_view.height;
+            let scale_x = 2.0 / merc.viewport_size.x;
+            let scale_y = -2.0 / merc.viewport_size.y;
             for tvt in &textured_visible_tiles {
                 let minmax = [
                     tvt.tex_minmax.x1 as f32,
