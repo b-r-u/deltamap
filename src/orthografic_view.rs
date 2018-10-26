@@ -179,6 +179,7 @@ impl OrthograficView {
     pub fn from_mercator_view(merc: &MercatorView) -> Self {
         let latlon = merc.center.to_latlon_rad();
         let zoom_delta = (1.0 / latlon.lat.cos()).log2();
+
         OrthograficView {
             viewport_size: merc.viewport_size,
             tile_size: merc.tile_size,
@@ -481,8 +482,8 @@ impl OrthograficView {
 
     /// Move the center of the viewport by approx. (`delta_x`, `delta_y`) in screen coordinates.
     pub fn move_pixel(&mut self, delta_x: f64, delta_y: f64) {
-        //TODO Do something more sophisticated
-        let scale = f64::powf(2.0, -self.zoom) / f64::from(self.tile_size);
+        let latlon = self.center.to_latlon_rad();
+        let scale = f64::powf(2.0, -self.zoom) / (f64::from(self.tile_size) * latlon.lat.cos());
         self.center.x += delta_x * scale;
         self.center.y += delta_y * scale;
         self.center.normalize_xy();
