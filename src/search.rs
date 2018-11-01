@@ -3,6 +3,7 @@ use osmpbf::{Blob, BlobDecode, BlobReader, PrimitiveBlock};
 use query::{find_query_matches, QueryArgs, QueryKind};
 use scoped_threadpool::Pool;
 use std::collections::hash_set::HashSet;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::sync_channel;
 use std::thread;
@@ -29,6 +30,40 @@ enum WorkerMessage {
     DoBlob(Box<Blob>),
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum MatchItem {
+    Node{id: i64, pos: LatLonDeg},
+    Way{id: i64, pos: LatLonDeg},
+}
+
+impl Hash for MatchItem {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match *self {
+            MatchItem::Node{id, pos: _} => {
+                1u64.hash(state);
+                id.hash(state);
+            },
+            MatchItem::Way{id, pos: _} => {
+                2u64.hash(state);
+                id.hash(state);
+            },
+        }
+    }
+}
+
+impl PartialEq for MatchItem {
+    fn eq(&self, other: &MatchItem) -> bool {
+        match (*self, *other) {
+            (MatchItem::Node{id: a, ..}, MatchItem::Node{id: b, ..}) => a == b,
+            (MatchItem::Way{id: a, ..}, MatchItem::Way{id: b, ..}) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for MatchItem {
+}
+
 pub fn par_search<P, F, G>(
     pbf_path: P,
     query_args: QueryArgs,
@@ -36,7 +71,7 @@ pub fn par_search<P, F, G>(
     finished_func: G,
 ) -> Result<thread::JoinHandle<()>, String>
 where P: AsRef<Path>,
-      F: Fn(Vec<LatLonDeg>) -> ControlFlow + Send + 'static,
+      F: Fn(HashSet<MatchItem>) -> ControlFlow + Send + 'static,
       G: Fn(Result<(), String>) + Send + 'static,
 {
     let pbf_path = PathBuf::from(pbf_path.as_ref());
@@ -48,45 +83,62 @@ where P: AsRef<Path>,
     Ok(handle)
 }
 
+fn first_query_pass(block: &PrimitiveBlock, query: &QueryKind)
+    -> (HashSet<MatchItem>, HashSet<i64>)
+{
+    let mut matches = HashSet::new();
+    let mut way_node_ids = HashSet::new();
+
+    match query {
+        &QueryKind::ValuePattern(ref query) => {
+            find_query_matches(block, query, &mut matches, &mut way_node_ids);
+        },
+        &QueryKind::KeyValue(ref query) => {
+            find_query_matches(block, query, &mut matches, &mut way_node_ids);
+        },
+        &QueryKind::Intersection(ref queries) => {
+            let mut q_iter = queries.iter();
+
+            let (mut sub_matches, mut sub_way_node_ids) = q_iter.next()
+                .map_or_else(
+                    || (HashSet::new(), HashSet::new()),
+                    |q| first_query_pass(block, q),
+                );
+
+            for q in q_iter {
+                let (m, w) = first_query_pass(block, q);
+                sub_matches = sub_matches.intersection(&m).cloned().collect();
+                sub_way_node_ids = sub_way_node_ids.intersection(&w).cloned().collect();
+            }
+            matches.extend(sub_matches);
+            way_node_ids.extend(sub_way_node_ids);
+        },
+    }
+
+    (matches, way_node_ids)
+}
+
 pub fn par_search_blocking<P, F>(
     pbf_path: P,
     query_args: QueryArgs,
     found_func: F,
 ) -> Result<(), String>
 where P: AsRef<Path>,
-      F: Fn(Vec<LatLonDeg>) -> ControlFlow + Send + 'static,
+      F: Fn(HashSet<MatchItem>) -> ControlFlow + Send + 'static,
 {
     let query = query_args.compile()?;
     let query = &query;
-
-    let first_pass = move |block: &PrimitiveBlock, _: &()| {
-        let mut matches = vec![];
-        let mut way_node_ids = vec![];
-
-        match query {
-            &QueryKind::ValuePattern(ref query) => {
-                find_query_matches(block, query, &mut matches, &mut way_node_ids);
-            },
-            &QueryKind::KeyValue(ref query) => {
-                find_query_matches(block, query, &mut matches, &mut way_node_ids);
-            },
-            _ => {
-                //TODO implement
-                unimplemented!();
-            },
-        }
-
-        (matches, way_node_ids)
-    };
 
     let mut way_node_ids: HashSet<i64> = HashSet::new();
 
     par_iter_blobs(
         &pbf_path,
         || {},
-        first_pass,
+        move |block: &PrimitiveBlock, _: &()| {
+            first_query_pass(block, query)
+        },
         |(matches, node_ids)| {
-            way_node_ids.extend(&node_ids);
+            way_node_ids.extend(node_ids);
             found_func(matches)
         },
     )?;
@@ -94,19 +146,23 @@ where P: AsRef<Path>,
     let way_node_ids = &way_node_ids;
 
     let second_pass = move |block: &PrimitiveBlock, _: &()| {
-        let mut matches = vec![];
+        let mut matches = HashSet::new();
 
         for node in block.groups().flat_map(|g| g.nodes()) {
             if way_node_ids.contains(&node.id()) {
-                let pos = LatLonDeg::new(node.lat(), node.lon());
-                matches.push(pos);
+                matches.insert(MatchItem::Way{
+                    id: node.id(),
+                    pos: LatLonDeg::new(node.lat(), node.lon()),
+                });
             }
         }
 
         for node in block.groups().flat_map(|g| g.dense_nodes()) {
             if way_node_ids.contains(&node.id) {
-                let pos = LatLonDeg::new(node.lat(), node.lon());
-                matches.push(pos);
+                matches.insert(MatchItem::Way{
+                    id: node.id,
+                    pos: LatLonDeg::new(node.lat(), node.lon()),
+                });
             }
         }
 

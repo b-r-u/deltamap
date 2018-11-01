@@ -1,6 +1,8 @@
 use coord::LatLonDeg;
 use osmpbf::{DenseNode, Node, PrimitiveBlock, Relation, Way};
 use regex::Regex;
+use search::MatchItem;
+use std::collections::hash_set::HashSet;
 
 
 pub trait Query {
@@ -16,14 +18,14 @@ pub trait Query {
 pub enum QueryArgs {
     ValuePattern(String),
     KeyValue(String, String),
-    Intersection(Box<(QueryArgs, QueryArgs)>),
+    Intersection(Vec<QueryArgs>),
 }
 
 #[derive(Debug)]
 pub enum QueryKind {
     ValuePattern(ValuePatternQuery),
     KeyValue(KeyValueQuery),
-    Intersection(Box<(QueryArgs, QueryArgs)>),
+    Intersection(Vec<QueryKind>),
 }
 
 impl QueryArgs {
@@ -35,9 +37,12 @@ impl QueryArgs {
             QueryArgs::KeyValue(k, v) => {
                 Ok(QueryKind::KeyValue(KeyValueQuery::new(k, v)))
             },
-            _ => {
-                //TODO implement
-                unimplemented!();
+            QueryArgs::Intersection(queries) => {
+                let mut subqueries = Vec::with_capacity(queries.len());
+                for q in queries {
+                    subqueries.push(q.compile()?);
+                }
+                Ok(QueryKind::Intersection(subqueries))
             },
         }
     }
@@ -189,27 +194,31 @@ impl Query for KeyValueQuery {
 pub fn find_query_matches<Q: Query>(
     block: &PrimitiveBlock,
     query: &Q,
-    matches: &mut Vec<LatLonDeg>,
-    way_node_ids: &mut Vec<i64>,
+    matches: &mut HashSet<MatchItem>,
+    way_node_ids: &mut HashSet<i64>,
 ) {
     if let Some(block_index) = query.create_block_index(block) {
         for node in block.groups().flat_map(|g| g.nodes()) {
             if query.node_matches(&block_index, &node) {
-                let pos = LatLonDeg::new(node.lat(), node.lon());
-                matches.push(pos);
+                matches.insert(MatchItem::Node{
+                    id: node.id(),
+                    pos: LatLonDeg::new(node.lat(), node.lon()),
+                });
             }
         }
 
         for node in block.groups().flat_map(|g| g.dense_nodes()) {
             if query.dense_node_matches(&block_index, &node) {
-                let pos = LatLonDeg::new(node.lat(), node.lon());
-                matches.push(pos);
+                matches.insert(MatchItem::Node{
+                    id: node.id,
+                    pos: LatLonDeg::new(node.lat(), node.lon()),
+                });
             }
         }
 
         for way in block.groups().flat_map(|g| g.ways()) {
             if query.way_matches(&block_index, &way) {
-                way_node_ids.push(way.refs_slice()[0]);
+                way_node_ids.insert(way.refs_slice()[0]);
             }
         }
     }

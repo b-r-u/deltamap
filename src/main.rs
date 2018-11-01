@@ -48,10 +48,12 @@ pub mod tile_source;
 pub mod url_template;
 pub mod vertex_attrib;
 
-use coord::{LatLonDeg, ScreenCoord};
+use coord::ScreenCoord;
 use glutin::dpi::{LogicalPosition, LogicalSize, PhysicalPosition};
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
+use search::MatchItem;
+use std::collections::hash_set::HashSet;
 use std::error::Error;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -91,13 +93,16 @@ fn handle_event(
     map: &mut MapViewGl,
     input_state: &mut InputState,
     sources: &mut TileSources,
-    marker_rx: &mpsc::Receiver<Vec<LatLonDeg>>,
+    marker_rx: &mpsc::Receiver<HashSet<MatchItem>>,
 ) -> Action {
     trace!("{:?}", event);
     match *event {
         Event::Awakened => {
-            for pos in marker_rx.try_iter().flat_map(|c| c.into_iter()) {
-                map.add_marker(pos.into());
+            for item in marker_rx.try_iter().flat_map(|c| c.into_iter()) {
+                match item {
+                    MatchItem::Node{pos, ..} => map.add_marker(pos.into()),
+                    MatchItem::Way{pos, ..} => map.add_marker(pos.into()),
+                }
             }
             Action::Redraw
         },

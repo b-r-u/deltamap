@@ -29,7 +29,7 @@ pub struct Config {
     sources: Vec<(String, TileSource)>,
     pbf_path: Option<PathBuf>,
     search_pattern: Option<String>,
-    keyval: Option<(String, String)>,
+    keyval: Vec<(String, String)>,
     fps: f64,
     use_network: bool,
     async: bool,
@@ -69,15 +69,20 @@ impl Config {
     fn merge_arg_matches<'a>(&mut self, matches: &clap::ArgMatches<'a>) {
         self.search_pattern = matches.value_of("search").map(|s| s.to_string());
 
-        self.keyval = matches.value_of("keyval").and_then(|kv| {
-            let mut split = kv.split(':');
-
-            if let (Some(key), Some(value)) = (split.next(), split.next()) {
-                Some((key.to_string(), value.to_string()))
-            } else {
-                None
-            }
-        });
+        self.keyval = matches.values_of("keyval").map_or_else(
+            || vec![],
+            |mut kv| {
+                let mut vec = vec![];
+                loop {
+                    if let (Some(k), Some(v)) = (kv.next(), kv.next()) {
+                        vec.push((k.to_string(), v.to_string()));
+                    } else {
+                        break;
+                    }
+                }
+                vec
+            },
+        );
 
         if let Some(Ok(fps)) = matches.value_of("fps").map(|s| s.parse()) {
             self.fps = fps;
@@ -241,7 +246,7 @@ impl Config {
                         sources: vec![],
                         pbf_path,
                         search_pattern: None,
-                        keyval: None,
+                        keyval: vec![],
                         fps,
                         use_network,
                         async,
@@ -403,19 +408,31 @@ impl Config {
         self.search_pattern.as_ref().map(|s| s.as_str())
     }
 
-    pub fn keyval(&self) -> Option<(&str, &str)> {
-        self.keyval.as_ref().map(|kv| (kv.0.as_str(), kv.1.as_str()))
+    pub fn keyval(&self) -> &[(String, String)] {
+        self.keyval.as_slice()
     }
 
     pub fn query_args(&self) -> Option<QueryArgs> {
-        match (&self.search_pattern, &self.keyval) {
-            (&Some(ref pattern), &None) => Some(QueryArgs::ValuePattern(pattern.to_string())),
-            (&None, &Some(ref kv)) => Some(QueryArgs::KeyValue(kv.0.to_string(), kv.1.to_string())),
-            (&Some(_), &Some(_)) => {
-                //TODO implement
-                unimplemented!();
+        match (&self.search_pattern, self.keyval.len()) {
+            (&Some(ref pattern), 0) => Some(QueryArgs::ValuePattern(pattern.to_string())),
+            (&None, 1) => Some(
+                QueryArgs::KeyValue(self.keyval[0].0.to_string(), self.keyval[0].1.to_string())
+            ),
+            (&Some(ref pattern), _) => {
+                let mut vec = vec![QueryArgs::ValuePattern(pattern.to_string())];
+
+                for (k, v) in &self.keyval {
+                    vec.push(QueryArgs::KeyValue(k.to_string(), v.to_string()));
+                }
+                Some(QueryArgs::Intersection(vec))
             },
-            (&None, &None) => None,
+            (&None, x) if x > 0 => {
+                let mut vec = self.keyval.iter()
+                    .map(|&(ref k, ref v)| QueryArgs::KeyValue(k.to_string(), v.to_string()))
+                    .collect();
+                Some(QueryArgs::Intersection(vec))
+            },
+            (&None, _) => None,
         }
     }
 
