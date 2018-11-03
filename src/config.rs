@@ -30,6 +30,7 @@ pub struct Config {
     pbf_path: Option<PathBuf>,
     search_pattern: Option<String>,
     keyval: Vec<(String, String)>,
+    keyvalregex: Vec<(String, String)>,
     fps: f64,
     use_network: bool,
     async: bool,
@@ -70,6 +71,21 @@ impl Config {
         self.search_pattern = matches.value_of("search").map(|s| s.to_string());
 
         self.keyval = matches.values_of("keyval").map_or_else(
+            || vec![],
+            |mut kv| {
+                let mut vec = vec![];
+                loop {
+                    if let (Some(k), Some(v)) = (kv.next(), kv.next()) {
+                        vec.push((k.to_string(), v.to_string()));
+                    } else {
+                        break;
+                    }
+                }
+                vec
+            },
+        );
+
+        self.keyvalregex = matches.values_of("keyvalregex").map_or_else(
             || vec![],
             |mut kv| {
                 let mut vec = vec![];
@@ -247,6 +263,7 @@ impl Config {
                         pbf_path,
                         search_pattern: None,
                         keyval: vec![],
+                        keyvalregex: vec![],
                         fps,
                         use_network,
                         async,
@@ -412,27 +429,42 @@ impl Config {
         self.keyval.as_slice()
     }
 
+    pub fn keyvalregex(&self) -> &[(String, String)] {
+        self.keyvalregex.as_slice()
+    }
+
     pub fn query_args(&self) -> Option<QueryArgs> {
-        match (&self.search_pattern, self.keyval.len()) {
-            (&Some(ref pattern), 0) => Some(QueryArgs::ValuePattern(pattern.to_string())),
-            (&None, 1) => Some(
-                QueryArgs::KeyValue(self.keyval[0].0.to_string(), self.keyval[0].1.to_string())
+        match (&self.search_pattern, self.keyval.first(), self.keyvalregex.first()) {
+            (&Some(ref pattern), None, None) => Some(
+                QueryArgs::ValuePattern(pattern.to_string())
             ),
-            (&Some(ref pattern), _) => {
-                let mut vec = vec![QueryArgs::ValuePattern(pattern.to_string())];
+            (&None, Some(keyval), None) => Some(
+                QueryArgs::KeyValue(keyval.0.to_string(), keyval.1.to_string())
+            ),
+            (&None, None, Some(keyvalregex)) => Some(
+                QueryArgs::KeyValueRegex(keyvalregex.0.to_string(), keyvalregex.1.to_string())
+            ),
+            (pattern_opt, _, _) => {
+                let mut vec = vec![];
+
+                if let Some(ref pattern) = pattern_opt {
+                    vec.push(QueryArgs::ValuePattern(pattern.to_string()));
+                }
 
                 for (k, v) in &self.keyval {
                     vec.push(QueryArgs::KeyValue(k.to_string(), v.to_string()));
                 }
-                Some(QueryArgs::Intersection(vec))
+
+                for (k, v) in &self.keyvalregex {
+                    vec.push(QueryArgs::KeyValueRegex(k.to_string(), v.to_string()));
+                }
+
+                if vec.is_empty() {
+                    None
+                } else {
+                    Some(QueryArgs::Intersection(vec))
+                }
             },
-            (&None, x) if x > 0 => {
-                let mut vec = self.keyval.iter()
-                    .map(|&(ref k, ref v)| QueryArgs::KeyValue(k.to_string(), v.to_string()))
-                    .collect();
-                Some(QueryArgs::Intersection(vec))
-            },
-            (&None, _) => None,
         }
     }
 

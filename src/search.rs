@@ -96,6 +96,9 @@ fn first_query_pass(block: &PrimitiveBlock, query: &QueryKind)
         &QueryKind::KeyValue(ref query) => {
             find_query_matches(block, query, &mut matches, &mut way_node_ids);
         },
+        &QueryKind::KeyValueRegex(ref query) => {
+            find_query_matches(block, query, &mut matches, &mut way_node_ids);
+        },
         &QueryKind::Intersection(ref queries) => {
             let mut q_iter = queries.iter();
 
