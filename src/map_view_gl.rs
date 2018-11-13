@@ -7,6 +7,7 @@ use mercator_tile_layer::MercatorTileLayer;
 use mercator_view::MercatorView;
 use ortho_tile_layer::OrthoTileLayer;
 use orthografic_view::OrthograficView;
+use path_layer::{PathElement, PathLayer};
 use projection::Projection;
 use projection_view::ProjectionView;
 use session::Session;
@@ -29,6 +30,7 @@ pub struct MapViewGl {
     tile_atlas: TileAtlas,
     mercator_tile_layer: MercatorTileLayer,
     marker_layer: MarkerLayer,
+    path_layer: PathLayer,
     ortho_tile_layer: OrthoTileLayer,
     atmos_layer: AtmosLayer,
     show_marker: bool,
@@ -39,10 +41,11 @@ pub struct MapViewGl {
 #[derive(Debug, Eq, PartialEq)]
 enum DrawType {
     Null,
-    Tiles,
+    Atmos,
     Markers,
     OrthoTiles,
-    Atmos,
+    Path,
+    Tiles,
 }
 
 impl MapViewGl {
@@ -97,6 +100,7 @@ impl MapViewGl {
             tile_atlas,
             mercator_tile_layer,
             marker_layer: MarkerLayer::new(cx),
+            path_layer: PathLayer::new(cx),
             ortho_tile_layer,
             atmos_layer,
             show_marker: true,
@@ -121,6 +125,10 @@ impl MapViewGl {
 
     pub fn add_marker(&mut self, map_coord: MapCoord) {
         self.marker_layer.add_marker(map_coord);
+    }
+
+    pub fn add_path_element(&mut self, ele: PathElement) {
+        self.path_layer.add_element(ele);
     }
 
     pub fn map_covers_viewport(&self) -> bool {
@@ -165,6 +173,21 @@ impl MapViewGl {
             source,
             &mut self.tile_cache,
             &mut self.tile_atlas,
+            snap_to_pixel
+        )
+    }
+
+    fn draw_mercator_path(&mut self, cx: &mut Context, merc: &MercatorView, snap_to_pixel: bool)
+    {
+        if self.last_draw_type != DrawType::Path {
+            self.last_draw_type = DrawType::Path;
+            self.path_layer.prepare_draw(cx);
+        }
+
+        self.path_layer.draw_mercator(
+            cx,
+            merc,
+            self.dpi_factor,
             snap_to_pixel
         )
     }
@@ -233,6 +256,9 @@ impl MapViewGl {
                 let snap_to_pixel = (merc.zoom - (merc.zoom + 0.5).floor()).abs() < 1e-10;
 
                 let ret = self.draw_mercator_tiles(cx, merc, source, snap_to_pixel);
+
+                self.draw_mercator_path(cx, merc, snap_to_pixel);
+
                 if self.show_marker && !self.marker_layer.is_empty() {
                     self.draw_mercator_marker(cx, merc, snap_to_pixel);
                 }

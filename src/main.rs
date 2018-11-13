@@ -33,6 +33,7 @@ pub mod mercator_tile_layer;
 pub mod mercator_view;
 pub mod ortho_tile_layer;
 pub mod orthografic_view;
+pub mod path_layer;
 pub mod program;
 pub mod projection;
 pub mod projection_view;
@@ -52,6 +53,7 @@ use coord::ScreenCoord;
 use glutin::dpi::{LogicalPosition, LogicalSize, PhysicalPosition};
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
+use path_layer::PathElement;
 use search::MatchItem;
 use std::collections::hash_set::HashSet;
 use std::error::Error;
@@ -101,7 +103,7 @@ fn handle_event(
             for item in marker_rx.try_iter().flat_map(|c| c.into_iter()) {
                 match item {
                     MatchItem::Node{pos, ..} => map.add_marker(pos.into()),
-                    MatchItem::Way{pos, ..} => map.add_marker(pos.into()),
+                    MatchItem::Way{pos, ..} => map.add_path_element(PathElement::MoveTo(pos.into())),
                 }
             }
             Action::Redraw

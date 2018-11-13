@@ -155,10 +155,25 @@ impl Program {
         }
     }
 
+    //TODO implement as generic function
+    pub fn set_uniform_1f(&mut self, cx: &mut Context, uniform_id: UniformId, v0: f32) {
+        cx.use_program(self.program_id);
+        unsafe {
+            cx.gl.Uniform1f(uniform_id.id, v0);
+        };
+    }
+
     pub fn set_uniform_2f(&mut self, cx: &mut Context, uniform_id: UniformId, v0: f32, v1: f32) {
         cx.use_program(self.program_id);
         unsafe {
             cx.gl.Uniform2f(uniform_id.id, v0, v1);
+        };
+    }
+
+    pub fn set_uniform_3f(&mut self, cx: &mut Context, uniform_id: UniformId, v0: f32, v1: f32, v2: f32) {
+        cx.use_program(self.program_id);
+        unsafe {
+            cx.gl.Uniform3f(uniform_id.id, v0, v1, v2);
         };
     }
 
