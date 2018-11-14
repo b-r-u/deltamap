@@ -29,4 +29,4 @@ scoped_threadpool = "0.1"
 toml = "0.4"
 
 [build-dependencies]
-gl_generator = "0.9"
+gl_generator = "0.10"
