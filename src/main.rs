@@ -49,13 +49,13 @@ pub mod tile_source;
 pub mod url_template;
 pub mod vertex_attrib;
 
-use coord::ScreenCoord;
+use coord::{LatLonDeg, ScreenCoord};
 use glutin::dpi::{LogicalPosition, LogicalSize, PhysicalPosition};
 use glutin::{ControlFlow, ElementState, Event, GlContext, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use map_view_gl::MapViewGl;
 use path_layer::PathElement;
 use search::MatchItem;
-use std::collections::hash_set::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -90,20 +90,55 @@ struct InputState {
     dpi_factor: f64,
 }
 
+struct QueryState {
+    way_nodes: HashMap<i64, LatLonDeg>,
+    incomplete_ways: Vec<Vec<i64>>,
+}
+
 fn handle_event(
     event: &Event,
     map: &mut MapViewGl,
     input_state: &mut InputState,
+    query_state: &mut QueryState,
     sources: &mut TileSources,
     marker_rx: &mpsc::Receiver<HashSet<MatchItem>>,
 ) -> Action {
     trace!("{:?}", event);
     match *event {
         Event::Awakened => {
+            let mut check_ways = false;
             for item in marker_rx.try_iter().flat_map(|c| c.into_iter()) {
                 match item {
                     MatchItem::Node{pos, ..} => map.add_marker(pos.into()),
-                    MatchItem::Way{pos, ..} => map.add_path_element(PathElement::MoveTo(pos.into())),
+                    MatchItem::WayNode{id, pos} => {
+                        query_state.way_nodes.insert(id, pos);
+                        check_ways = true;
+                    }
+                    MatchItem::Way{nodes, ..} => {
+                        query_state.incomplete_ways.push(nodes);
+                        check_ways = true;
+                    },
+                }
+            }
+            if check_ways {
+                let mut complete_ways = vec![];
+                'outer: for (way_index, way) in query_state.incomplete_ways.iter().enumerate() {
+                    for node_id in way {
+                        if !query_state.way_nodes.contains_key(&node_id) {
+                            continue 'outer;
+                        }
+                    }
+                    complete_ways.push(way_index);
+                    // all nodes present
+                    if !way.is_empty() {
+                        map.add_path_element(PathElement::MoveTo((*query_state.way_nodes.get(&way[0]).unwrap()).into()));
+                        for node_id in way.iter().skip(1) {
+                            map.add_path_element(PathElement::LineTo((*query_state.way_nodes.get(node_id).unwrap()).into()));
+                        }
+                    }
+                }
+                for way_index in complete_ways.into_iter().rev() {
+                    query_state.incomplete_ways.swap_remove(way_index);
                 }
             }
             Action::Redraw
@@ -312,6 +347,11 @@ fn run() -> Result<(), Box<Error>> {
         dpi_factor: window.get_hidpi_factor(),
     };
 
+    let mut query_state = QueryState {
+        way_nodes: HashMap::new(),
+        incomplete_ways: vec![],
+    };
+
     let mut map = {
         let proxy = events_loop.create_proxy();
 
@@ -370,7 +410,7 @@ fn run() -> Result<(), Box<Error>> {
         let mut action = Action::Nothing;
 
         events_loop.run_forever(|event| {
-            let a = handle_event(&event, &mut map, &mut input_state, &mut sources, &marker_rx);
+            let a = handle_event(&event, &mut map, &mut input_state, &mut query_state, &mut sources, &marker_rx);
             action.combine_with(a);
             ControlFlow::Break
         });
@@ -380,7 +420,7 @@ fn run() -> Result<(), Box<Error>> {
         }
 
         events_loop.poll_events(|event| {
-            let a = handle_event(&event, &mut map, &mut input_state, &mut sources, &marker_rx);
+            let a = handle_event(&event, &mut map, &mut input_state, &mut query_state, &mut sources, &marker_rx);
             action.combine_with(a);
             if action == Action::Close {
                 return;
@@ -398,7 +438,7 @@ fn run() -> Result<(), Box<Error>> {
                     std::thread::sleep(dur);
 
                     events_loop.poll_events(|event| {
-                        let a = handle_event(&event, &mut map, &mut input_state, &mut sources, &marker_rx);
+                        let a = handle_event(&event, &mut map, &mut input_state, &mut query_state, &mut sources, &marker_rx);
                         action.combine_with(a);
                         if action == Action::Close {
                             return;

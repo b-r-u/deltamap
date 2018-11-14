@@ -30,10 +30,11 @@ enum WorkerMessage {
     DoBlob(Box<Blob>),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum MatchItem {
     Node{id: i64, pos: LatLonDeg},
-    Way{id: i64, pos: LatLonDeg},
+    Way{id: i64, nodes: Vec<i64>},
+    WayNode{id: i64, pos: LatLonDeg},
 }
 
 impl Hash for MatchItem {
@@ -43,8 +44,12 @@ impl Hash for MatchItem {
                 1u64.hash(state);
                 id.hash(state);
             },
-            MatchItem::Way{id, pos: _} => {
+            MatchItem::Way{id, nodes: _} => {
                 2u64.hash(state);
+                id.hash(state);
+            },
+            MatchItem::WayNode{id, pos: _} => {
+                3u64.hash(state);
                 id.hash(state);
             },
         }
@@ -53,9 +58,10 @@ impl Hash for MatchItem {
 
 impl PartialEq for MatchItem {
     fn eq(&self, other: &MatchItem) -> bool {
-        match (*self, *other) {
+        match (self, other) {
             (MatchItem::Node{id: a, ..}, MatchItem::Node{id: b, ..}) => a == b,
             (MatchItem::Way{id: a, ..}, MatchItem::Way{id: b, ..}) => a == b,
+            (MatchItem::WayNode{id: a, ..}, MatchItem::WayNode{id: b, ..}) => a == b,
             _ => false,
         }
     }
@@ -153,7 +159,7 @@ where P: AsRef<Path>,
 
         for node in block.groups().flat_map(|g| g.nodes()) {
             if way_node_ids.contains(&node.id()) {
-                matches.insert(MatchItem::Way{
+                matches.insert(MatchItem::WayNode{
                     id: node.id(),
                     pos: LatLonDeg::new(node.lat(), node.lon()),
                 });
@@ -162,7 +168,7 @@ where P: AsRef<Path>,
 
         for node in block.groups().flat_map(|g| g.dense_nodes()) {
             if way_node_ids.contains(&node.id) {
-                matches.insert(MatchItem::Way{
+                matches.insert(MatchItem::WayNode{
                     id: node.id,
                     pos: LatLonDeg::new(node.lat(), node.lon()),
                 });

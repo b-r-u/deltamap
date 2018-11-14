@@ -313,7 +313,11 @@ pub fn find_query_matches<Q: Query>(
 
         for way in block.groups().flat_map(|g| g.ways()) {
             if query.way_matches(&block_index, &way) {
-                way_node_ids.insert(way.refs_slice()[0]);
+                way_node_ids.extend(way.refs());
+                matches.insert(MatchItem::Way{
+                    id: way.id(),
+                    nodes: way.refs().collect(),
+                });
             }
         }
     }
