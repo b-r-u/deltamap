@@ -32,6 +32,8 @@ pub fn parse<'a>() -> clap::ArgMatches<'a> {
             .short("s")
             .long("search")
             .value_name("PATTERN")
+            .number_of_values(1)
+            .multiple(true)
             .help("Search for places which match the given pattern")
             .takes_value(true))
         .arg(Arg::with_name("keyval")

@@ -28,7 +28,7 @@ pub struct Config {
     tile_cache_dir: PathBuf,
     sources: Vec<(String, TileSource)>,
     pbf_path: Option<PathBuf>,
-    search_pattern: Option<String>,
+    search_patterns: Vec<String>,
     keyval: Vec<(String, String)>,
     keyvalregex: Vec<(String, String)>,
     fps: f64,
@@ -68,7 +68,12 @@ impl Config {
     }
 
     fn merge_arg_matches<'a>(&mut self, matches: &clap::ArgMatches<'a>) {
-        self.search_pattern = matches.value_of("search").map(|s| s.to_string());
+        self.search_patterns = matches.values_of("search").map_or_else(
+            || vec![],
+            |p| {
+                p.map(|s| s.to_string()).collect()
+            },
+        );
 
         self.keyval = matches.values_of("keyval").map_or_else(
             || vec![],
@@ -261,7 +266,7 @@ impl Config {
                         tile_cache_dir,
                         sources: vec![],
                         pbf_path,
-                        search_pattern: None,
+                        search_patterns: vec![],
                         keyval: vec![],
                         keyvalregex: vec![],
                         fps,
@@ -421,8 +426,8 @@ impl Config {
         self.pbf_path.as_ref().map(|p| p.as_path())
     }
 
-    pub fn search_pattern(&self) -> Option<&str> {
-        self.search_pattern.as_ref().map(|s| s.as_str())
+    pub fn search_patterns(&self) -> &[String] {
+        self.search_patterns.as_slice()
     }
 
     pub fn keyval(&self) -> &[(String, String)] {
@@ -434,9 +439,17 @@ impl Config {
     }
 
     pub fn query_args(&self) -> Option<QueryArgs> {
-        match (&self.search_pattern, self.keyval.first(), self.keyvalregex.first()) {
+        match (&self.search_patterns.first(), self.keyval.first(), self.keyvalregex.first()) {
             (&Some(ref pattern), None, None) => Some(
-                QueryArgs::ValuePattern(pattern.to_string())
+                if self.search_patterns.len() == 1 {
+                    QueryArgs::ValuePattern(pattern.to_string())
+                } else {
+                    QueryArgs::Intersection(
+                        self.search_patterns.iter()
+                            .map(|s| QueryArgs::ValuePattern(s.to_string()))
+                            .collect()
+                    )
+                }
             ),
             (&None, Some(keyval), None) => Some(
                 if self.keyval.len() == 1 {
