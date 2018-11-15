@@ -439,10 +439,26 @@ impl Config {
                 QueryArgs::ValuePattern(pattern.to_string())
             ),
             (&None, Some(keyval), None) => Some(
-                QueryArgs::KeyValue(keyval.0.to_string(), keyval.1.to_string())
+                if self.keyval.len() == 1 {
+                    QueryArgs::KeyValue(keyval.0.to_string(), keyval.1.to_string())
+                } else {
+                    QueryArgs::Intersection(
+                        self.keyval.iter()
+                            .map(|(k, v)| QueryArgs::KeyValue(k.to_string(), v.to_string()))
+                            .collect()
+                    )
+                }
             ),
             (&None, None, Some(keyvalregex)) => Some(
-                QueryArgs::KeyValueRegex(keyvalregex.0.to_string(), keyvalregex.1.to_string())
+                if self.keyvalregex.len() == 1 {
+                    QueryArgs::KeyValueRegex(keyvalregex.0.to_string(), keyvalregex.1.to_string())
+                } else {
+                    QueryArgs::Intersection(
+                        self.keyvalregex.iter()
+                            .map(|(k, v)| QueryArgs::KeyValueRegex(k.to_string(), v.to_string()))
+                            .collect()
+                    )
+                }
             ),
             (pattern_opt, _, _) => {
                 let mut vec = vec![];
