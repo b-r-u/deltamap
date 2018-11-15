@@ -130,11 +130,37 @@ fn handle_event(
                     }
                     complete_ways.push(way_index);
                     // all nodes present
-                    if !way.is_empty() {
-                        map.add_path_element(PathElement::MoveTo((*query_state.way_nodes.get(&way[0]).unwrap()).into()));
-                        for node_id in way.iter().skip(1) {
-                            map.add_path_element(PathElement::LineTo((*query_state.way_nodes.get(node_id).unwrap()).into()));
-                        }
+                    match way.len() {
+                        0 => {},
+                        1 => {
+                            map.add_path_element(
+                                PathElement::MoveTo((*query_state.way_nodes.get(&way[0]).unwrap()).into())
+                            );
+                            map.add_path_element(PathElement::ClosePath);
+                        },
+                        2 => {
+                            map.add_path_element(
+                                PathElement::MoveTo((*query_state.way_nodes.get(&way[0]).unwrap()).into())
+                            );
+                            map.add_path_element(
+                                PathElement::LineTo((*query_state.way_nodes.get(&way[1]).unwrap()).into())
+                            );
+                        },
+                        len => {
+                            map.add_path_element(PathElement::MoveTo((*query_state.way_nodes.get(&way[0]).unwrap()).into()));
+
+                            if way.first() == way.last() {
+                                for node_id in way.iter().skip(1).take(len - 2) {
+                                    map.add_path_element(PathElement::LineTo((*query_state.way_nodes.get(node_id).unwrap()).into()));
+                                }
+                                map.add_path_element(PathElement::ClosePath);
+                            } else {
+                                for node_id in way.iter().skip(1) {
+                                    map.add_path_element(PathElement::LineTo((*query_state.way_nodes.get(node_id).unwrap()).into()));
+                                }
+                            }
+
+                        },
                     }
                 }
                 for way_index in complete_ways.into_iter().rev() {
