@@ -4,7 +4,6 @@ rust:
   - beta
   - nightly
   - 1.29.2
-cache: cargo
 dist: trusty
 sudo: false
 addons:
