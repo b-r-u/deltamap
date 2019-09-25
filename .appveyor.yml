@@ -7,7 +7,7 @@ environment:
   - TARGET: x86_64-pc-windows-msvc
     CHANNEL: stable
   - TARGET: x86_64-pc-windows-msvc
-    CHANNEL: 1.29.2
+    CHANNEL: 1.37.0
   - TARGET: x86_64-pc-windows-gnu
     CHANNEL: stable
   - TARGET: x86_64-pc-windows-gnu
