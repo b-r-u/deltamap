@@ -3,7 +3,7 @@ rust:
   - stable
   - beta
   - nightly
-  - 1.37.0
+  - 1.45.2
 dist: trusty
 sudo: false
 addons:
